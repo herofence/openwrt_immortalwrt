@@ -8,7 +8,7 @@ on:
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: openwrt-25.12
-  CONFIG_FILE: configs/openwrt.config
+  CONFIG_FILE: configs/X86.config
   ENV_SH: scripts/environment.sh
   DIY_P1_SH: scripts/diy-part1.sh
   THEME_SETTING_SH: scripts/theme-setting.sh
