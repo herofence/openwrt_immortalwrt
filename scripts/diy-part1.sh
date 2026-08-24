@@ -72,4 +72,10 @@ fi
 # 10. 取消主题默认配置覆盖
 find package/luci-theme-*/* -type f -name '*luci-theme-*' -print -exec sed -i '/set luci.main.mediaurlbase/d' {} \; 2>/dev/null
 
+# 11. 强行注入 Docker 配置（参考 M4 配置，确保正确编译 Docker）
+echo "CONFIG_PACKAGE_luci-app-dockerman=y" >> .config
+echo "CONFIG_PACKAGE_docker-ce=y" >> .config
+echo "CONFIG_PACKAGE_docker-ce-cli=y" >> .config
+echo "CONFIG_PACKAGE_containerd=y" >> .config
+
 echo "脚本执行完成"
