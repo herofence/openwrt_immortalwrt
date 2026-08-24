@@ -5,3 +5,5 @@ https://github.com/vernesong/OpenClash<br>
 https://github.com/lisaac/luci-app-dockerman<br>
 https://github.com/XiaoBinin/Actions-immortalwrt<br>
 https://github.com/innmonkeyone/immortalwrt-N1<br>
+
+https://github.com/RNGCHEER/nanopim4-immortalwrt<br>
