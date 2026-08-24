@@ -21,7 +21,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
 
     steps:
     - name: 容量设置
@@ -55,6 +55,7 @@ jobs:
         DEBIAN_FRONTEND: noninteractive
       run: |
         sudo -E apt-get -qq update > /dev/null
+        if [ -f "$ENV_SH" ]; then bash $ENV_SH; fi
         sudo -E apt-get -qq install -y $(curl -fsSL https://raw.githubusercontent.com/nantayo/My-Pkg/master/openwrt) > /dev/null
         sudo -E apt-get -qq autoremove --purge > /dev/null
         sudo -E apt-get -qq clean > /dev/null
@@ -75,7 +76,6 @@ jobs:
         echo 'src-git nas https://github.com/linkease/nas-packages.git;master' >> feeds.conf.default
         echo 'src-git nas_luci https://github.com/linkease/nas-packages-luci.git;main' >> feeds.conf.default
         echo "OPENWRT_PATH=$PWD" >> $GITHUB_ENV
-        # 获取源码提交信息
         COMMIT_AUTHOR=$(git show -s --date=short --format="作者: %an" 2>/dev/null || echo "作者: 未知")
         echo "COMMIT_AUTHOR=$COMMIT_AUTHOR" >> $GITHUB_ENV
         COMMIT_DATE=$(git show -s --date=short --format="时间: %ci" 2>/dev/null || echo "时间: 未知")
@@ -89,10 +89,6 @@ jobs:
       working-directory: ./openwrt
       run: |
         ./scripts/feeds update -a
-        echo >> feeds.conf.default
-        ./scripts/feeds install -a -p nas
-        ./scripts/feeds install -a -p nas_luci
-        ./scripts/feeds install -d y -p istore luci-app-store
         ./scripts/feeds install -a
 
     - name: 加载默认配置
@@ -122,12 +118,11 @@ jobs:
         export GO111MODULE=on
         export GOTOOLCHAIN=auto
         echo -e "$(nproc) thread compile"
-        make -j$(nproc) || make -j1 || make -j1 V=s
+        make -j$(nproc) || make -j1 V=s
         echo "date1=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
         echo "date2=$(date "+%Y年%m月%d日")" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
-        # 获取内核版本与平台信息
         KERNEL_VER=$(cat bin/targets/x86/64/*.manifest | grep ^kernel | head -1 | cut -d- -f2 | tr -d ' ' 2>/dev/null || echo "未知")
         echo "KERNEL_VER=$KERNEL_VER" >> $GITHUB_ENV
         DEVICE_TARGET=$(cat .config | grep CONFIG_TARGET_BOARD | awk -F '"' '{print $2}' 2>/dev/null || echo "x86")
@@ -141,10 +136,8 @@ jobs:
       run: |
         cd openwrt/bin/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}
 
-        # 复制配置文件
         [ -f "$OPENWRT_PATH/.config" ] && cp "$OPENWRT_PATH/.config" build.config
 
-        # 生成 config.buildinfo 文件
         cat > config.buildinfo << EOF
         CONFIG_TARGET_BOARD=${{ env.DEVICE_TARGET }}
         CONFIG_TARGET_SUBTARGET=${{ env.DEVICE_SUBTARGET }}
@@ -156,7 +149,6 @@ jobs:
         CONFIG_RANDOM_CODE=${{ github.run_number }}
         EOF
 
-        # 清理无用文件（修复：保留 x86 的 *.img.gz 和 *.bin 固件）
         echo "清理不需要的文件..."
         rm -rf packages
         rm -f *rootfs.tar.gz *.json sha256sums *.manifest
