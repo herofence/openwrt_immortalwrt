@@ -54,12 +54,11 @@ jobs:
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-        sudo -E apt-get -qq update > /dev/null
-        if [ -f "$ENV_SH" ]; then bash $ENV_SH; fi
-        sudo -E apt-get -qq install -y $(curl -fsSL https://raw.githubusercontent.com/nantayo/My-Pkg/master/openwrt) > /dev/null
-        sudo -E apt-get -qq autoremove --purge > /dev/null
-        sudo -E apt-get -qq clean > /dev/null
-        sudo timedatectl set-timezone "$TZ"
+       chmod +x $ENV_SH
+       bash $ENV_SH
+       sudo -E apt-get -qq autoremove --purge > /dev/null
+       sudo -E apt-get -qq clean > /dev/null
+       sudo timedatectl set-timezone "$TZ"
 
     - name: 系统信息
       env:
