@@ -6,7 +6,7 @@ BACKGROUND_URL="https://raw.githubusercontent.com/herofence/openwrt/main/backgro
 TARGET_BG="$ARGON_THEME_DIR/htdocs/luci-static/argon/background/background.jpg"
 
 # 确保目录存在
-mkdir -p "$ARGON_THEME_DIR/htdocs/luci-static/argon/background"
+mkdir -p "$ARGON_THEME_DIR/htdocs/luci-static/data"
 
 # 下载并替换背景图片
 echo "正在替换 Argon 主题背景图片..."
