@@ -16,10 +16,10 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-    - name: Checkout
+    - name: 1_Checkout
       uses: actions/checkout@v4
 
-    - name: Free up disk space
+    - name: 2_Free up disk space
       uses: jlumbroso/free-disk-space@main
       with:
         tool-cache: false
@@ -30,7 +30,7 @@ jobs:
         docker-images: true
         swap-storage: true
 
-    - name: Build FriendlyElec U-Boot
+    - name: 3_Build FriendlyElec U-Boot
       run: |
         set -e
         sudo apt-get update
@@ -75,13 +75,13 @@ jobs:
         echo "=== U-Boot final files ==="
         ls -la /tmp/uboot-final/
 
-    - name: Clone iStore OS and configure
+    - name: 4_Clone iStore OS and configure
       run: |
         sudo apt-get install -y ack antlr3 asciidoc autoconf automake binutils bison build-essential bzip2 ccache clang cmake cpio curl device-tree-compiler ecj fastjar flex gawk gettext gcc-multilib g++-multilib gnutls-dev gperf haveged help2man intltool lib32gcc-s1 libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pip python3-ply python3-docutils python3-pyelftools python3-setuptools qemu-utils re2c rsync scons squashfs-tools subversion swig texinfo uglifyjs unzip vim wget xmlto xxd zlib1g-dev
         rm -rf istoreos
         git clone -b istoreos-24.10 --depth 1 https://github.com/istoreos/istoreos.git
 
-    - name: Add NanoPi M4 and inject U-Boot
+    - name: 5_Add NanoPi M4 and inject U-Boot
       working-directory: istoreos
       run: |
         # Add device to armv8.mk
@@ -97,7 +97,7 @@ jobs:
           sed -i '/nanopc-t4-rk3399/a\  nanopi-m4-rk3399 \\' package/boot/uboot-rockchip/Makefile
         fi
 
-    - name: Configure iStore OS
+    - name: 6_Configure iStore OS
       working-directory: istoreos
       run: |
         ./scripts/feeds update -a
@@ -117,7 +117,7 @@ jobs:
         echo "CONFIG_PACKAGE_luci-app-store=y" >> .config
         make defconfig
 
-    - name: Build U-Boot and inject
+    - name: 7_Build U-Boot and inject
       working-directory: istoreos
       run: |
         make package/boot/uboot-rockchip/compile -j$(nproc) V=s || true
@@ -147,13 +147,13 @@ jobs:
         echo "=== Final check ==="
         ls -la "$UBOOT_STAGING"/ | grep -i "nanopi\|u-boot\|uboot" || echo "WARNING: Still no nanopi-m4 u-boot files"
 
-    - name: Compile firmware
+    - name: 8_Compile firmware
       working-directory: istoreos
       run: |
         make -j$(nproc) || make -j1 V=s
         echo "BUILD_STATUS=success" >> $GITHUB_ENV
 
-    - name: Organize files
+    - name: 9_Organize files
       if: env.BUILD_STATUS == 'success'
       working-directory: istoreos
       run: |
@@ -164,19 +164,19 @@ jobs:
         find bin/targets -name "*.itb" -exec cp {} ../output/ \;
         ls -la ../output/
 
-    - name: Upload firmware
+    - name: 10_Upload firmware
       uses: actions/upload-artifact@v4
       if: env.BUILD_STATUS == 'success'
       with:
         name: iStoreOS-NanoPiM4-${{ github.run_id }}
         path: output/
 
-    - name: Generate release tag
+    - name: 11_Generate release tag
       id: tag
       if: env.BUILD_STATUS == 'success'
       run: echo "RELEASE_TAG=iStoreOS-$(date +%%Y.%%m.%%d.%%H%%M)" >> $GITHUB_OUTPUT
 
-    - name: Create Release
+    - name: 11_Create Release
       if: env.BUILD_STATUS == 'success'
       uses: softprops/action-gh-release@v2
       with:
