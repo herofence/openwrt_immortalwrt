@@ -13,7 +13,7 @@ rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/packages/net/v2ray-geodata
 # 删除有冲突的内核补丁
-rm -f target/linux/generic/backport-6.12/436-v7.3-mtd-spinand-fmsh-add-support-for-FM25G01B-FM25G02B.patch
+rm -f target/linux/generic/backport-6.12/*fmsh*.patch
 
 # 4. 克隆第三方插件包到 package/community 目录
 mkdir -p package/community
