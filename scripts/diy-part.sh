@@ -71,5 +71,3 @@ fi
 
 # 10. 取消主题默认配置覆盖
 find package/luci-theme-*/* -type f -name '*luci-theme-*' -print -exec sed -i '/set luci.main.mediaurlbase/d' {} \; 2>/dev/null
-
-# 注意：已移除原第11节中所有关于 dockerd 的修复代码，避免干扰编译
