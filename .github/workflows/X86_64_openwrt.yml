@@ -108,13 +108,16 @@ jobs:
           if [ -f "$DOCKERD_MAKEFILE" ]; then
             echo "=== 修复前的相关代码 ==="
             grep -n -B2 -A5 "Copying nested executables" "$DOCKERD_MAKEFILE" || true
-
-            # 将包含空源变量的 cp 命令替换为 true（跳过复制）
-            # 针对形如 cp $(CP) $(xxx) bundles/binary-daemon/ 的行
-            sed -i '/Copying nested executables/,/endef/ {
-              /cp .*\$(CP).*\$(.*).*bundles\/binary-daemon/ s/^/#/
-            }' "$DOCKERD_MAKEFILE"
-
+            awk -i inplace '
+            /Copying nested executables/ {in_block=1}
+            in_block && /^[ \t]*(cp|\$\(CP\))/ {
+              if ($0 !~ /^[ \t]*-/) {
+                sub(/^([ \t]*)/, "\\1-")
+                }
+              }
+              in_block && /^[^ \t]/ {in_block=0}
+              {print}
+            ' "$DOCKERD_MAKEFILE"
             echo "=== 修复后的相关代码 ==="
             grep -n -B2 -A5 "Copying nested executables" "$DOCKERD_MAKEFILE" || true
           else
