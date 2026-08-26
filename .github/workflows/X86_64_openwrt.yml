@@ -90,38 +90,28 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: 加载定自义配置
+      - name: 加载默认配置
         run: |
           chmod +x $DIY_P1_SH $OPENWRT_NAME/*.sh
           cd openwrt
           [ -f "$GITHUB_WORKSPACE/$CONFIG_FILE" ] && cp "$GITHUB_WORKSPACE/$CONFIG_FILE" .config
           bash $GITHUB_WORKSPACE/$DIY_P1_SH
           bash $GITHUB_WORKSPACE/$THEME_SETTING_SH
-          bash $GITHUB_WORKSPACE/$PRESET_CLASH_SH amd64
+          bash $GITHUB_WORKSPACE/$PRESET_CLASH_SH amd6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 修复 dockerd 编译问题
+      # 新增步骤：移除 docker-proxy 独立包，避免 dockerd 复制空路径错误
+      - name: 移除 docker-proxy 独立包配置
         working-directory: ./openwrt
         run: |
-          DOCKERD_MAKEFILE="feeds/packages/utils/dockerd/Makefile"
-          if [ -f "$DOCKERD_MAKEFILE" ]; then
-            echo "=== 修复前的相关代码 ==="
-            grep -n -B2 -A5 "Copying nested executables" "$DOCKERD_MAKEFILE" || true
-            awk -i inplace '
-            /Copying nested executables/ {in_block=1}
-            in_block && /^[ \t]*(cp|\$\(CP\))/ {
-              if ($0 !~ /^[ \t]*-/) {
-                sub(/^([ \t]*)/, "\\1-")
-                }
-              }
-              in_block && /^[^ \t]/ {in_block=0}
-              {print}
-            ' "$DOCKERD_MAKEFILE"
-            echo "=== 修复后的相关代码 ==="
-            grep -n -B2 -A5 "Copying nested executables" "$DOCKERD_MAKEFILE" || true
+          if grep -q '^CONFIG_PACKAGE_docker-proxy=y' .config; then
+            echo "发现 CONFIG_PACKAGE_docker-proxy=y，将其移除"
+            sed -i '/^CONFIG_PACKAGE_docker-proxy=y/d' .config
+            echo "已移除，当前相关配置："
+            grep -i 'docker-proxy' .config || true
           else
-            echo "未找到 dockerd Makefile，跳过修复"
+            echo "未发现 CONFIG_PACKAGE_docker-proxy=y，无需处理"
           fi
 
       - name: 下载安装包
