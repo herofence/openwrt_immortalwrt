@@ -72,21 +72,4 @@ fi
 # 10. 取消主题默认配置覆盖
 find package/luci-theme-*/* -type f -name '*luci-theme-*' -print -exec sed -i '/set luci.main.mediaurlbase/d' {} \; 2>/dev/null
 
-#11. 修复 dockerd 编译错误（构建 docker-proxy 并安全复制）
-DOCKERD_MAKEFILE="feeds/packages/utils/dockerd/Makefile"
-if [ -f "$DOCKERD_MAKEFILE" ]; then
-    # 1. 在 Build/Compile 中添加构建 docker-proxy 的指令（放在 dockerd 构建之后）
-    # 查找 '$(call Build/Compile/Default)' 并其后插入一行
-    sed -i '/^define Build\/Compile/,/^endef/ {
-        /^\t$(call Build\/Compile\/Default)/ a\
-	(cd $(PKG_BUILD_DIR); $(GO_PKG_VARS) go build -o bundles/binary-daemon/docker-proxy ./cmd/docker-proxy)
-    }' "$DOCKERD_MAKEFILE"
-
-    # 2. 修改复制命令：仅当文件存在时复制，否则跳过
-    # 找到 "Copying nested executables" 行，然后修改下一行的 cp 为条件拷贝
-    sed -i '/^.*Copying nested executables.*$/ {
-        n
-        s/^cp /[ -f "bundles\/binary-daemon\/docker-proxy" ] \&\& cp -f bundles\/binary-daemon\/docker-proxy bundles\/binary-daemon\/ || true; /
-    }' "$DOCKERD_MAKEFILE"
-fi
-echo "脚本执行完成"
+# 注意：已移除原第11节中所有关于 dockerd 的修复代码，避免干扰编译
