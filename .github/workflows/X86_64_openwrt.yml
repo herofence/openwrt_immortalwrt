@@ -90,7 +90,7 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: 加载默认配置
+      - name: 加载定自义配置
         run: |
           chmod +x $DIY_P1_SH $OPENWRT_NAME/*.sh
           cd openwrt
@@ -101,7 +101,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 新增步骤：修复 dockerd 编译问题
       - name: 修复 dockerd 编译问题
         working-directory: ./openwrt
         run: |
