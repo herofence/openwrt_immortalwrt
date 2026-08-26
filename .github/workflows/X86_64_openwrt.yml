@@ -97,7 +97,7 @@ jobs:
           [ -f "$GITHUB_WORKSPACE/$CONFIG_FILE" ] && cp "$GITHUB_WORKSPACE/$CONFIG_FILE" .config
           bash $GITHUB_WORKSPACE/$DIY_P1_SH
           bash $GITHUB_WORKSPACE/$THEME_SETTING_SH
-          bash $GITHUB_WORKSPACE/$PRESET_CLASH_SH amd6
+          bash $GITHUB_WORKSPACE/$PRESET_CLASH_SH amd64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
