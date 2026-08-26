@@ -97,9 +97,30 @@ jobs:
           [ -f "$GITHUB_WORKSPACE/$CONFIG_FILE" ] && cp "$GITHUB_WORKSPACE/$CONFIG_FILE" .config
           bash $GITHUB_WORKSPACE/$DIY_P1_SH
           bash $GITHUB_WORKSPACE/$THEME_SETTING_SH
-          bash $GITHUB_WORKSPACE/$PRESET_CLASH_SH amd6
+          bash $GITHUB_WORKSPACE/$PRESET_CLASH_SH amd64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 新增步骤：修复 dockerd 编译问题
+      - name: 修复 dockerd 编译问题
+        working-directory: ./openwrt
+        run: |
+          DOCKERD_MAKEFILE="feeds/packages/utils/dockerd/Makefile"
+          if [ -f "$DOCKERD_MAKEFILE" ]; then
+            echo "=== 修复前的相关代码 ==="
+            grep -n -B2 -A5 "Copying nested executables" "$DOCKERD_MAKEFILE" || true
+
+            # 将包含空源变量的 cp 命令替换为 true（跳过复制）
+            # 针对形如 cp $(CP) $(xxx) bundles/binary-daemon/ 的行
+            sed -i '/Copying nested executables/,/endef/ {
+              /cp .*\$(CP).*\$(.*).*bundles\/binary-daemon/ s/^/#/
+            }' "$DOCKERD_MAKEFILE"
+
+            echo "=== 修复后的相关代码 ==="
+            grep -n -B2 -A5 "Copying nested executables" "$DOCKERD_MAKEFILE" || true
+          else
+            echo "未找到 dockerd Makefile，跳过修复"
+          fi
 
       - name: 下载安装包
         id: package
