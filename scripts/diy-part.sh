@@ -71,3 +71,5 @@ fi
 
 # 10. 取消主题默认配置覆盖
 find package/luci-theme-*/* -type f -name '*luci-theme-*' -print -exec sed -i '/set luci.main.mediaurlbase/d' {} \; 2>/dev/null
+
+echo "脚本执行完成"
