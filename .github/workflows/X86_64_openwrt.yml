@@ -143,7 +143,6 @@ jobs:
       if: ${{ env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
       run: |
         cd openwrt/bin/targets/x86/64
-        # 复制 build.config 和 config.buildinfo 到固件目录（如果存在）
         [ -f "$OPENWRT_PATH/.config" ] && cp "$OPENWRT_PATH/.config" build.config
         # 生成 config.buildinfo 文件
         cat > config.buildinfo << EOF
