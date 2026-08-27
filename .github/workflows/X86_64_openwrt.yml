@@ -127,6 +127,7 @@ jobs:
         make -j$(nproc) || make -j1 || make -j1 V=s
         echo "date1=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
         echo "date2=$(date "+%Y年%m月%d日")" >> $GITHUB_ENV
+        echo "date_tag=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
         # 获取内核版本
         KERNEL_VER=$(cat bin/targets/x86/64/*.manifest | grep ^kernel | head -1 | cut -d- -f2 | tr -d ' ' 2>/dev/null || echo "未知")
@@ -142,7 +143,21 @@ jobs:
       if: ${{ env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
       run: |
         cd openwrt/bin/targets/x86/64
-        rm -rf packages *rootfs.tar.gz *rootfs.img.gz *combined.img.gz *.bin *.config *.buildinfo *.json sha256sums *.manifest
+        # 复制 build.config 和 config.buildinfo 到固件目录（如果存在）
+        [ -f "$OPENWRT_PATH/.config" ] && cp "$OPENWRT_PATH/.config" build.config
+        # 生成 config.buildinfo 文件
+        cat > config.buildinfo << EOF
+        CONFIG_TARGET_BOARD=${{ env.DEVICE_TARGET }}
+        CONFIG_TARGET_SUBTARGET=${{ env.DEVICE_SUBTARGET }}
+        CONFIG_KERNEL_VERSION=${{ env.KERNEL_VER }}
+        CONFIG_REPO_URL=${{ env.REPO_URL }}
+        CONFIG_REPO_BRANCH=${{ env.REPO_BRANCH }}
+        CONFIG_BUILD_DATE=${{ env.date1 }}
+        CONFIG_BUILD_NUMBER=${{ github.run_number }}
+        CONFIG_RANDOM_CODE=${{ steps.random.outputs.random_code }}
+        EOF
+        # 删除不需要的文件
+        rm -rf packages *rootfs.tar.gz *rootfs.img.gz *combined.img.gz *.bin *.config *.buildinfo *.json sha256sums *.manifest 2>/dev/null || true
         for file in immortalwrt-*-*.img.gz; do
             mv "$file" "docker-$file"
         done
@@ -160,8 +175,10 @@ jobs:
       id: tag
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
-        echo "release_tag=${{ env.date2 }}" >> $GITHUB_OUTPUT
-        cat > release.txt << EOF        
+       RANDOM_CODE="${{ steps.random.outputs.random_code }}"  
+       echo "release_tag=immortalwrt_x86_64_${{ env.date_tag }}_build${{ github.run_number }}_${RANDOM_CODE}" >> $GITHUB_OUTPUT
+       echo "release_name=immortalwrt_x86_64_${{ env.date_tag }}_build${{ github.run_number }}" >> $GITHUB_OUTPUT
+       cat > release.txt << EOF
         ### 🎉 固件信息
         - 🍁 平台架构: ${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}
         - 🌳 固件源码: ${{ env.REPO_URL }}
@@ -185,6 +202,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         files: ${{ env.FIRMWARE }}/*
-        name: ${{ env.date3 }}
+        name: ${{ steps.tag.outputs.release_name }}
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
