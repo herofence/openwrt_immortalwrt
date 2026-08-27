@@ -2,29 +2,25 @@ name: immortalwrt_x86_64
 
 on:
   workflow_dispatch:
-  schedule:
-  # 每周五 3:00执行一次
-   - cron: 0 19 * * THU
 
 env:
-  REPO_URL: https://github.com/immortalwrt/immortalwrt
-  REPO_BRANCH: master
-  CONFIG_FILE: configs/openwrt.config
-  DIY_P1_SH: scripts/diy-part.sh
-  THEME_SETTING_SH: scripts/theme-setting.sh
-  PRESET_CLASH_SH: scripts/preset-clash-core.sh
+  REPO_URL: https://github.com/DHDAXCW/immortalwrt
+  REPO_BRANCH: openwrt-24.10
+  CONFIG_FILE: immortalwrt/x86_64/defconfig
+  DIY_P1_SH: immortalwrt/diy-part1.sh
+  DIY_P2_SH: immortalwrt/diy-part2.sh
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
-  OPENWRT_NAME: scripts
-  OPENWRT_NAME1: configs
+  OPENWRT_NAME: immortalwrt
+  OPENWRT_NAME1: x86_64
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: 容量设置
+    - name: Maximize build space
       uses: easimon/maximize-build-space@master
       with:
         root-reserve-mb: 512
@@ -34,12 +30,12 @@ jobs:
         remove-haskell: 'true'
         remove-codeql: 'true'
         
-    - name: 查看项目代码
+    - name: Check out the project branch
       uses: actions/checkout@main
       with:
           fetch-depth: 0
           
-    - name: 清理缓存
+    - name: Clean build caches
       run: |
         echo "Cleaning previous build artifacts and caches..."
         sudo rm -rf $GITHUB_WORKSPACE/openwrt || true
@@ -50,7 +46,7 @@ jobs:
         rm -rf ~/.cache/* || true
         echo "Cache cleanup complete."
         
-    - name: 初始化编译环境
+    - name: Initialize the compilation environment
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
@@ -63,51 +59,56 @@ jobs:
         sudo -E apt-get -qq clean ) &
         sudo timedatectl set-timezone "$TZ"
         
-    - name: 系统信息
+    - name: Initialize Environment and Display System Info
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
         chmod +x $OPENWRT_NAME/*.sh
         $GITHUB_WORKSPACE/$OPENWRT_NAME/system-Information.sh
         
-    - name: 下载源码
+    - name: Download firmware source code
       run: |
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
-        cd openwrt
-        echo "OPENWRT_PATH=$PWD" >> $GITHUB_ENV
-        COMMIT_AUTHOR=$(git show -s --date=short --format="作者: %an" 2>/dev/null || echo "作者: 未知")
-        echo "COMMIT_AUTHOR=$COMMIT_AUTHOR" >> $GITHUB_ENV
-        COMMIT_DATE=$(git show -s --date=short --format="时间: %ci" 2>/dev/null || echo "时间: 未知")
-        echo "COMMIT_DATE=$COMMIT_DATE" >> $GITHUB_ENV
-        COMMIT_MESSAGE=$(git show -s --date=short --format="内容: %s" 2>/dev/null || echo "内容: 未知")
-        echo "COMMIT_MESSAGE=$COMMIT_MESSAGE" >> $GITHUB_ENV
-        COMMIT_HASH=$(git show -s --date=short --format="hash: %H" 2>/dev/null || echo "hash: 未知")
-        echo "COMMIT_HASH=$COMMIT_HASH" >> $GITHUB_ENV
 
-    - name: 更新和安装源
+    - name: Update & install feeds
       working-directory: ./openwrt
       run: |
         ./scripts/feeds update -a
         ./scripts/feeds install -a
         
-    - name: 加载自定义配置
+    - name: Load feeds.conf.default
       run: |
         chmod +x $OPENWRT_NAME/*.sh
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
-        $GITHUB_WORKSPACE/$THEME_SETTING_SH
-        $GITHUB_WORKSPACE/$PRESET_CLASH_SH
-        
-    - name: 下载安装包
+
+    - name: Load config
+      run: |
+        [ -e "$CONFIG_FILE" ] && cat "$CONFIG_FILE" > openwrt/.config
+        chmod +x $OPENWRT_NAME/*.sh && cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P2_SH
+
+    - name: Download the installation package
       id: package
       run: |
         cd openwrt
+        echo '
+        CONFIG_DOCKER_CGROUP_OPTIONS=y
+        CONFIG_DOCKER_NET_MACVLAN=y
+        CONFIG_DOCKER_STO_EXT4=y
+        CONFIG_PACKAGE_docker=y
+        CONFIG_PACKAGE_docker-compose=y
+        CONFIG_PACKAGE_dockerd=y
+        CONFIG_PACKAGE_luci-app-dockerman=y
+        CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y
+        CONFIG_PACKAGE_luci-lib-docker=y
+        ' >> .config
         make defconfig
         make download -j$(nproc)
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
              
-    - name: 编译固件
+    - name: Compile the firmware
       id: compile
       run: |
         cd openwrt
@@ -116,54 +117,33 @@ jobs:
         echo "date1=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
         echo "date2=$(date "+%Y年%m月%d日")" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
-        # 获取内核版本
-        KERNEL_VER=$(cat bin/targets/x86/64/*.manifest | grep ^kernel | head -1 | cut -d- -f2 | tr -d ' ' 2>/dev/null || echo "未知")
-        echo "KERNEL_VER=$KERNEL_VER" >> $GITHUB_ENV
-        # 获取平台信息
-        DEVICE_TARGET=$(cat .config | grep CONFIG_TARGET_BOARD | awk -F '"' '{print $2}' 2>/dev/null || echo "x86")
-        echo "DEVICE_TARGET=$DEVICE_TARGET" >> $GITHUB_ENV
-        DEVICE_SUBTARGET=$(cat .config | grep CONFIG_TARGET_SUBTARGET | awk -F '"' '{print $2}' 2>/dev/null || echo "64")
-        echo "DEVICE_SUBTARGET=$DEVICE_SUBTARGET" >> $GITHUB_ENV
 
-    - name: 整理文件
+    - name: Organize and Rename Files
       id: organize
       if: ${{ env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
       run: |
         cd openwrt/bin/targets/x86/64
         rm -rf packages *rootfs.tar.gz *rootfs.img.gz *combined.img.gz *.bin *.config *.buildinfo *.json sha256sums *.manifest
         for file in immortalwrt-*-*.img.gz; do
-            mv "$file" "$file"
+            mv "$file" "docker-$file"
         done
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
         
-    - name: 上传固件
+    - name: Upload the firmware to github
       uses: actions/upload-artifact@main
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
         name: ${{ env.date1 }}_${{ env.OPENWRT_NAME }}_${{ env.OPENWRT_NAME1 }}
         path: ${{ env.FIRMWARE }}
 
-    - name: 发布标签
+    - name: Generate release tags
       id: tag
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
         echo "release_tag=${{ env.date2 }}" >> $GITHUB_OUTPUT
-        cat > release.txt << EOF
-        ### ?? 固件信息
-        - ?? 平台架构: ${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}
-        - ? 固件源码: ${{ env.REPO_URL }}
-        - ?? 源码分支: ${{ env.REPO_BRANCH }}
-        - ?? 内核版本: ${{ env.KERNEL_VER }}
-        - ?? 默认地址: 192.168.1.1
-        - ?? 默认密码: password
-        ### ?? 固件版本
-        - 固件编译前最后一次 [主源码](${{ env.REPO_URL }}) 更新记录
-        - ${{ env.COMMIT_DATE }}
-        - ${{ env.COMMIT_MESSAGE }}
-        - ${{ env.COMMIT_HASH }}
-        - ${{ env.COMMIT_AUTHOR }}
-        EOF
+        touch release.txt
+        echo "📥 固件下载" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
         
     - name: Publish to release
