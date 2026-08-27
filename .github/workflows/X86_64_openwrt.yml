@@ -8,9 +8,9 @@ on:
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: openwrt-25.12
-  CONFIG_FILE: configs/X86.config
+  CONFIG_FILE: configs/openwrt.config
   ENV_SH: scripts/environment.sh
-  DIY_P1_SH: scripts/diy-part.sh
+  DIY_P1_SH: scripts/diy-part1.sh
   THEME_SETTING_SH: scripts/theme-setting.sh
   PRESET_CLASH_SH: scripts/preset-clash-core.sh
   UPLOAD_FIRMWARE: true
@@ -54,8 +54,8 @@ jobs:
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-        chmod +x $ENV_SH
-        bash $ENV_SH
+        sudo -E apt-get -qq update > /dev/null
+        sudo -E apt-get -qq install -y $(curl -fsSL https://raw.githubusercontent.com/nantayo/My-Pkg/master/openwrt) > /dev/null
         sudo -E apt-get -qq autoremove --purge > /dev/null
         sudo -E apt-get -qq clean > /dev/null
         sudo timedatectl set-timezone "$TZ"
@@ -94,32 +94,7 @@ jobs:
         ./scripts/feeds install -a -p nas_luci
         ./scripts/feeds install -d y -p istore luci-app-store
         ./scripts/feeds install -a
-        
-    - name: 替换 dockerd 编译逻辑
-      working-directory: ./openwrt
-      run: |
-          DOCKERD_MAKEFILE="feeds/packages/utils/dockerd/Makefile"
-          if [ -f "$DOCKERD_MAKEFILE" ]; then
-           sed -i '/Build\/Compile/,/^endef/c\
-           define Build/Compile\n\
-           ( cd $(PKG_BUILD_DIR); \\\n\
-          GO111MODULE=on \\\n\
-                GOTOOLCHAIN=local \\\n\
-                CGO_ENABLED=1 \\\n\
-                GOOS=linux \\\n\
-                GOARCH=$(ARCH) \\\n\
-                go build -mod=vendor -o dockerd \\\n\
-                -tags "netgo osusergo static_build" \\\n\
-                -ldflags "-w -X github.com/docker/docker/dockerversion.Version=$(PKG_VERSION)" \\\n\
-                github.com/docker/docker/cmd/dockerd \\\n\
-           )\n\
-           $(CP) $(PKG_BUILD_DIR)/dockerd $(PKG_INSTALL_DIR)/usr/bin/\n\
-            endef' "$DOCKERD_MAKEFILE"
-            echo "已替换 dockerd Build/Compile 段"
-          else
-            echo "未找到 dockerd Makefile"
-          fi
-      
+
     - name: 加载默认配置
       run: |
         chmod +x $DIY_P1_SH $OPENWRT_NAME/*.sh
