@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Maximize build space
+    - name: 容量设置
       uses: easimon/maximize-build-space@master
       with:
         root-reserve-mb: 512
@@ -30,12 +30,12 @@ jobs:
         remove-haskell: 'true'
         remove-codeql: 'true'
         
-    - name: Check out the project branch
+    - name: 查看项目代码
       uses: actions/checkout@main
       with:
           fetch-depth: 0
           
-    - name: Clean build caches
+    - name: 清理缓存
       run: |
         echo "Cleaning previous build artifacts and caches..."
         sudo rm -rf $GITHUB_WORKSPACE/openwrt || true
@@ -46,7 +46,7 @@ jobs:
         rm -rf ~/.cache/* || true
         echo "Cache cleanup complete."
         
-    - name: Initialize the compilation environment
+    - name: 初始化编译环境
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
@@ -59,36 +59,36 @@ jobs:
         sudo -E apt-get -qq clean ) &
         sudo timedatectl set-timezone "$TZ"
         
-    - name: Initialize Environment and Display System Info
+    - name: 系统信息
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
         chmod +x $OPENWRT_NAME/*.sh
         $GITHUB_WORKSPACE/$OPENWRT_NAME/system-Information.sh
         
-    - name: Download firmware source code
+    - name: 下载源码
       run: |
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
 
-    - name: Update & install feeds
+    - name: 更新和安装源
       working-directory: ./openwrt
       run: |
         ./scripts/feeds update -a
         ./scripts/feeds install -a
         
-    - name: Load feeds.conf.default
+    - name: 加载自定义配置
       run: |
         chmod +x $OPENWRT_NAME/*.sh
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
 
-    - name: Load config
+    - name: 下载配置
       run: |
         [ -e "$CONFIG_FILE" ] && cat "$CONFIG_FILE" > openwrt/.config
         chmod +x $OPENWRT_NAME/*.sh && cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: Download the installation package
+    - name: 下载安装包
       id: package
       run: |
         cd openwrt
@@ -108,7 +108,7 @@ jobs:
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
              
-    - name: Compile the firmware
+    - name: 编译固件
       id: compile
       run: |
         cd openwrt
@@ -118,7 +118,7 @@ jobs:
         echo "date2=$(date "+%Y年%m月%d日")" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: Organize and Rename Files
+    - name: 整理文件
       id: organize
       if: ${{ env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
       run: |
@@ -137,7 +137,7 @@ jobs:
         name: ${{ env.date1 }}_${{ env.OPENWRT_NAME }}_${{ env.OPENWRT_NAME1 }}
         path: ${{ env.FIRMWARE }}
 
-    - name: Generate release tags
+    - name: 生成标志
       id: tag
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
@@ -146,7 +146,7 @@ jobs:
         echo "📥 固件下载" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
         
-    - name: Publish to release
+    - name: 发布标签
       uses: softprops/action-gh-release@v1
       if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
