@@ -1,13 +1,6 @@
 #!/bin/bash
 
-# 1. 修改默认IP
-sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
-
-# 2. 设置 Git 使用 token 认证
-if [ -n "${GITHUB_TOKEN}" ]; then
-    git config --global url."https://oauth2:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
-fi
-#合并package
+# Merge_package
 function merge_package(){
     repo=`echo $1 | rev | cut -d'/' -f 1 | rev`
     pkg=`echo $2 | rev | cut -d'/' -f 1 | rev`
@@ -35,3 +28,7 @@ git clone --depth=1 https://github.com/Siriling/5G-Modem-Support && rm -rf 5G-Mo
 git clone --depth=1 https://github.com/gdy666/luci-app-lucky
 popd
 
+# add luci-app-mosdns
+rm -rf feeds/packages/net/v2ray-geodata
+git clone https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
+git clone https://github.com/sbwml/v2ray-geodata package/v2ray-geodata
