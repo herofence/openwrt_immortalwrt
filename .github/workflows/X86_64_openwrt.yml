@@ -110,8 +110,12 @@ jobs:
     - name: 降级 dockerd 到 26.2.1
       working-directory: ./openwrt
       run: |
+          set -e
           DOCKERD_MAKEFILE="feeds/packages/utils/dockerd/Makefile"
-          if [ -f "$DOCKERD_MAKEFILE" ]; then
+          if [ ! -f "$DOCKERD_MAKEFILE" ]; then
+            echo "错误：未找到 dockerd Makefile"
+            exit 1
+            fi
             # 修改版本号
             sed -i 's/^PKG_VERSION:=27\.3\.1/PKG_VERSION:=26.2.1/' "$DOCKERD_MAKEFILE"
 
@@ -119,16 +123,6 @@ jobs:
             TARBALL_URL="https://codeload.github.com/moby/moby/tar.gz/refs/tags/v26.2.1"
             TMP_TARBALL="/tmp/dockerd-26.2.1.tar.gz"
             echo "正在下载源码包..."
-            curl -L --fail -o "$TMP_TARBALL" "$TARBALL_URL" || {
-            echo "下载失败，请检查网络或 URL"
-            exit 1
-            }
-            # 验证下载文件大小（至少 > 1MB）
-            FILE_SIZE=$(stat -c%s "$TMP_TARBALL" 2>/dev/null || echo 0)
-            if [ "$FILE_SIZE" -lt 1000000 ]; then
-              echo "错误：下载的文件过小（${FILE_SIZE} 字节），可能不是有效的源码包"
-              exit 1
-              fi
               # 计算哈希
             HASH=$(sha256sum "$TMP_TARBALL" | awk '{print $1}')
             echo "计算得到哈希: $HASH"
