@@ -106,6 +106,35 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+
+    - name: 降级 dockerd 到 26.2.1
+      working-directory: ./openwrt
+      run: |
+          DOCKERD_MAKEFILE="feeds/packages/utils/dockerd/Makefile"
+          if [ -f "$DOCKERD_MAKEFILE" ]; then
+            # 修改版本号
+            sed -i 's/^PKG_VERSION:=27\.3\.1/PKG_VERSION:=26.2.1/' "$DOCKERD_MAKEFILE"
+
+            # 下载源码并计算哈希
+            TARBALL_URL="https://codeload.github.com/moby/moby/tar.gz/v26.2.1"
+            TMP_TARBALL="/tmp/dockerd-26.2.1.tar.gz"
+            curl -L -o "$TMP_TARBALL" "$TARBALL_URL"
+            HASH=$(sha256sum "$TMP_TARBALL" | awk '{print $1}')
+            echo "计算得到哈希: $HASH"
+
+            # 替换 PKG_HASH
+            sed -i "s/^PKG_HASH:=.*/PKG_HASH:=$HASH/" "$DOCKERD_MAKEFILE"
+
+            # 移除 docker-proxy 独立包（如果 .config 中存在）
+            sed -i '/^CONFIG_PACKAGE_docker-proxy=y/d' .config
+
+            echo "=== 修改后的版本信息 ==="
+            grep -E '^PKG_VERSION|^PKG_HASH' "$DOCKERD_MAKEFILE"
+          else
+            echo "未找到 dockerd Makefile"
+            exit 1
+          fi
+        
     - name: 下载安装包
       id: package
       run: |
