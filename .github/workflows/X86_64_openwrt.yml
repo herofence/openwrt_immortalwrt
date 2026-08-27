@@ -9,6 +9,9 @@ env:
   CONFIG_FILE: configs/X86.config
   DIY_P1_SH: scripts/diy-part1.sh
   DIY_P2_SH: scripts/diy-part2.sh
+  THEME_SETTING_SH: scripts/theme-setting.sh
+  PRESET_CLASH_SH: scripts/preset-clash-core.sh
+  SYSTEM_INFO_SH: scripts/system-Information.sh
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
@@ -64,7 +67,7 @@ jobs:
         DEBIAN_FRONTEND: noninteractive
       run: |
         chmod +x $OPENWRT_NAME/*.sh
-        $GITHUB_WORKSPACE/$OPENWRT_NAME/system-Information.sh
+        $GITHUB_WORKSPACE/SYSTEM_INFO_SH
         
     - name: 下载源码
       run: |
