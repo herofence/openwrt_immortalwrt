@@ -1,217 +1,294 @@
-name: immortalwrt_x86_64
+name: Autobuild OpenWrt
 
 on:
+  schedule:
+    - cron: '0 18 1,15 * *' # 2nd and 16th at 2:00 AM UTC+8
   workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Build every source even if upstream has not moved'
+        required: false
+        type: boolean
+        default: false
+      only:
+        description: "Comma-separated source ids, e.g. 'lede,openwrt' (default: all)"
+        required: false
+        default: ''
+
+permissions:
+  contents: write
 
 env:
-  REPO_URL: https://github.com/DHDAXCW/immortalwrt
-  REPO_BRANCH: openwrt-24.10
-  CONFIG_FILE: configs/X86.config
-  DIY_P1_SH: scripts/diy-part1.sh
-  DIY_P2_SH: scripts/diy-part2.sh
-  THEME_SETTING_SH: scripts/theme-setting.sh
-  PRESET_CLASH_SH: scripts/preset-clash-core.sh
-  SYSTEM_INFO_SH: scripts/system-Information.sh
-  UPLOAD_FIRMWARE: true
-  UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
-  OPENWRT_NAME: immortalwrt
-  OPENWRT_NAME1: x86_64
 
 jobs:
-  build:
+  check-upstream:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.resolve.outputs.matrix }}
+      any: ${{ steps.resolve.outputs.any }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Resolve upstream heads
+        id: resolve
+        env:
+          FORCE: ${{ inputs.force_build }}
+          ONLY: ${{ inputs.only }}
+        run: ./scripts/resolve-upstream.sh
+
+  build:
+    needs: check-upstream
+    if: needs.check-upstream.outputs.any == 'true'
+    runs-on: ubuntu-22.04
+    # One source failing must not hide the state of the other three.
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.check-upstream.outputs.matrix) }}
+    name: build (${{ matrix.id }})
 
     steps:
-    - name: 容量设置
-      uses: easimon/maximize-build-space@master
-      with:
-        root-reserve-mb: 512
-        swap-size-mb: 1024
-        remove-dotnet: 'true'
-        remove-android: 'true'
-        remove-haskell: 'true'
-        remove-codeql: 'true'
+      - name: Checkout
+        uses: actions/checkout@v5
 
-    - name: 查看项目代码
-      uses: actions/checkout@main
-      with:
-        fetch-depth: 0
+      - name: Initialization environment
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
 
-    - name: 清理缓存
-      run: |
-        echo "Cleaning previous build artifacts and caches..."
-        sudo rm -rf $GITHUB_WORKSPACE/openwrt || true
-        sudo rm -rf $RUNNER_TEMP/* || true
-        sudo rm -rf $RUNNER_TOOL_CACHE/* || true
-        sudo apt-get -qq clean || true
-        sudo rm -rf /var/lib/apt/lists/* || true
-        rm -rf ~/.cache/* || true
-        echo "Cache cleanup complete."
+          # moby's hack/make/binary-daemon copies host binaries into the bundle
+          # whenever /usr/local/bin/runc exists. The runner ships runc but has
+          # no docker-init, rootlesskit or dockerd-rootless.sh, so `command -v`
+          # returns empty and the build dies with "cp: cannot stat ''", taking
+          # the dockerd package with it. Deleting runc makes the copy return
+          # early; docker-proxy still comes from the separate binary-proxy
+          # target, so nothing the package installs is lost.
+          sudo rm -f /usr/local/bin/runc
 
-    - name: 初始化编译环境
-      env:
-        DEBIAN_FRONTEND: noninteractive
-      run: |
-        sudo -E apt-get -qq update
-        sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
-                                    bzip2 ccache clang cmake cpio curl device-tree-compiler ecj fastjar flex gawk gettext gcc-multilib g++-multilib \
-                                    git gnutls-dev gperf haveged help2man intltool lib32gcc-s1 libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev \
-                                    libltdl-dev libmpc-dev libmpfr-dev libncurses-dev libpython3-dev libreadline-dev libssl-dev libtool libyaml-dev \
-                                    libz-dev lld llvm lrzsz mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf python3 \
-                                    python3-pip python3-ply python3-docutils python3-pyelftools qemu-utils re2c rsync scons \
-                                    squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
-        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
-        sudo -E apt-get -qq autoremove --purge
-        sudo -E apt-get -qq clean
-        sudo timedatectl set-timezone "$TZ"
+          # Do not reach for a dependency list over the network. The upstream
+          # template used `curl -fsSL git.io/depends-ubuntu-1804`; git.io shut
+          # down in 2022, curl -f exited non-zero, and `apt-get install` with no
+          # arguments exits 0 -- so the step stayed green while every build ran
+          # without its dependencies.
+          sudo -E apt-get -qq update
+          sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
+            bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git \
+            gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev \
+            libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool \
+            lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pyelftools \
+            python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip \
+            vim wget xmlto xxd zlib1g-dev zstd
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
+          sudo timedatectl set-timezone "$TZ"
+          sudo mkdir -p /workdir
+          sudo chown $USER:$GROUPS /workdir
 
-    - name: 生成随机码
-      id: random
-      run: |
-        echo "random_code=$(date +%s%N | sha256sum | head -c 8)" >> $GITHUB_OUTPUT
+      - name: Clone source code
+        working-directory: /workdir
+        run: |
+          set -euo pipefail
+          df -hT $PWD
+          git clone --depth 1 --branch '${{ matrix.branch }}' '${{ matrix.repo }}' openwrt
+          cd openwrt
+          head="$(git rev-parse HEAD)"
+          if [ "$head" != '${{ matrix.sha }}' ]; then
+            # Upstream moved between resolve and clone. Pin to the SHA the
+            # release will claim, so the two can never disagree.
+            git fetch --depth 1 origin '${{ matrix.sha }}'
+            git checkout --detach '${{ matrix.sha }}'
+          fi
+          git --no-pager log -1 --format='pinned at %H (%ad)'
+          ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-    - name: 系统信息
-      run: |
-        chmod +x $GITHUB_WORKSPACE/$SYSTEM_INFO_SH
-        $GITHUB_WORKSPACE/$SYSTEM_INFO_SH
+      - name: Load custom feeds
+        run: |
+          set -euo pipefail
+          chmod +x '${{ matrix.diy1 }}'
+          cd openwrt
+          "$GITHUB_WORKSPACE/${{ matrix.diy1 }}"
+          echo '--- feeds.conf.default ---'
+          cat feeds.conf.default
 
-    - name: 下载源码
-      run: |
-        git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
-        cd openwrt
-        echo "OPENWRT_PATH=$PWD" >> $GITHUB_ENV
-        # 获取源码提交信息
-        COMMIT_AUTHOR=$(git show -s --date=short --format="作者: %an" 2>/dev/null || echo "作者: 未知")
-        echo "COMMIT_AUTHOR=$COMMIT_AUTHOR" >> $GITHUB_ENV
-        COMMIT_DATE=$(git show -s --date=short --format="时间: %ci" 2>/dev/null || echo "时间: 未知")
-        echo "COMMIT_DATE=$COMMIT_DATE" >> $GITHUB_ENV
-        COMMIT_MESSAGE=$(git show -s --date=short --format="内容: %s" 2>/dev/null || echo "内容: 未知")
-        echo "COMMIT_MESSAGE=$COMMIT_MESSAGE" >> $GITHUB_ENV
-        COMMIT_HASH=$(git show -s --date=short --format="hash: %H" 2>/dev/null || echo "hash: 未知")
-        echo "COMMIT_HASH=$COMMIT_HASH" >> $GITHUB_ENV
+      - name: Update feeds
+        run: cd openwrt && ./scripts/feeds update -a
 
-    - name: 更新和安装源
-      working-directory: ./openwrt
-      run: |
-        ./scripts/feeds update -a
-        ./scripts/feeds install -a
+      - name: Install feeds
+        run: cd openwrt && ./scripts/feeds install -a
 
-    - name: 加载自定义配置
-      run: |
-        chmod +x $GITHUB_WORKSPACE/$DIY_P1_SH
-        cd openwrt
-        $GITHUB_WORKSPACE/$DIY_P1_SH
+      - name: Load custom configuration
+        run: |
+          set -euo pipefail
+          cp '${{ matrix.config }}' openwrt/.config
+          chmod +x scripts/diy-part2.sh
+          cd openwrt
+          "$GITHUB_WORKSPACE/scripts/diy-part2.sh"
 
-    - name: 更新配置
-      run: |
-        [ -e "$CONFIG_FILE" ] && cat "$CONFIG_FILE" > openwrt/.config
-        chmod +x $GITHUB_WORKSPACE/$DIY_P2_SH
-        cd openwrt
-        $GITHUB_WORKSPACE/$DIY_P2_SH
+      - name: Download package
+        run: |
+          cd openwrt
+          make defconfig
+          make download -j8
+          find dl -size -1024c -exec ls -l {} \;
+          find dl -size -1024c -exec rm -f {} \;
 
-    - name: 下载安装包
-      id: package
-      run: |
-        cd openwrt
-        echo '
-        CONFIG_DOCKER_CGROUP_OPTIONS=y
-        CONFIG_DOCKER_NET_MACVLAN=y
-        CONFIG_DOCKER_STO_EXT4=y
-        CONFIG_PACKAGE_docker=y
-        CONFIG_PACKAGE_docker-compose=y
-        CONFIG_PACKAGE_dockerd=y
-        CONFIG_PACKAGE_luci-app-dockerman=y
-        CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y
-        CONFIG_PACKAGE_luci-lib-docker=y
-        ' >> .config
-        make defconfig
-        make download -j$(nproc)
-        find dl -size -1024c -exec ls -l {} \;
-        find dl -size -1024c -exec rm -f {} \;
+      - name: Compile the firmware
+        id: compile
+        run: |
+          cd openwrt
+          echo -e "$(nproc) thread compile"
+          make -j$(nproc) || make -j1 || make -j1 V=s
+          echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: 编译固件
-      id: compile
-      run: |
-        cd openwrt
-        echo -e "$(nproc) thread compile"
-        make -j$(nproc) || make -j1 || make -j1 V=s
-        echo "date1=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
-        echo "date2=$(date "+%Y年%m月%d日")" >> $GITHUB_ENV
-        echo "date_tag=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
-        echo "status=success" >> $GITHUB_OUTPUT
-        # 获取内核版本
-        KERNEL_VER=$(cat bin/targets/x86/64/*.manifest | grep ^kernel | head -1 | cut -d- -f2 | tr -d ' ' 2>/dev/null || echo "未知")
-        echo "KERNEL_VER=$KERNEL_VER" >> $GITHUB_ENV
-        # 获取平台信息
-        DEVICE_TARGET=$(cat .config | grep CONFIG_TARGET_BOARD | awk -F '"' '{print $2}' 2>/dev/null || echo "x86")
-        echo "DEVICE_TARGET=$DEVICE_TARGET" >> $GITHUB_ENV
-        DEVICE_SUBTARGET=$(cat .config | grep CONFIG_TARGET_SUBTARGET | awk -F '"' '{print $2}' 2>/dev/null || echo "64")
-        echo "DEVICE_SUBTARGET=$DEVICE_SUBTARGET" >> $GITHUB_ENV
+      - name: Upload build logs
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: build-logs-${{ matrix.id }}
+          path: openwrt/logs
+          if-no-files-found: ignore
+          retention-days: 30
 
-    - name: 整理文件
-      id: organize
-      if: ${{ env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
-      run: |
-        cd openwrt/bin/targets/x86/64
-        [ -f "$OPENWRT_PATH/.config" ] && cp "$OPENWRT_PATH/.config" build.config
-        # 生成 config.buildinfo 文件
-        cat > config.buildinfo << EOF
-        CONFIG_TARGET_BOARD=${{ env.DEVICE_TARGET }}
-        CONFIG_TARGET_SUBTARGET=${{ env.DEVICE_SUBTARGET }}
-        CONFIG_KERNEL_VERSION=${{ env.KERNEL_VER }}
-        CONFIG_REPO_URL=${{ env.REPO_URL }}
-        CONFIG_REPO_BRANCH=${{ env.REPO_BRANCH }}
-        CONFIG_BUILD_DATE=${{ env.date1 }}
-        CONFIG_BUILD_NUMBER=${{ github.run_number }}
-        CONFIG_RANDOM_CODE=${{ steps.random.outputs.random_code }}
-        EOF
-        # 删除不需要的文件
-        rm -rf packages *rootfs.tar.gz *rootfs.img.gz *combined.img.gz *.bin *.config *.buildinfo *.json sha256sums *.manifest 2>/dev/null || true
-        for file in immortalwrt-*-*.img.gz; do
-            mv "$file" "docker-$file"
-        done
-        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-        echo "status=success" >> $GITHUB_OUTPUT
+      - name: Check space usage
+        if: (!cancelled())
+        run: df -hT
 
-    - name: 上传固件
-      uses: actions/upload-artifact@main
-      if: steps.organize.outputs.status == 'success' && !cancelled()
-      with:
-        name: ${{ env.date1 }}_${{ env.OPENWRT_NAME }}_${{ env.OPENWRT_NAME1 }}
-        path: ${{ env.FIRMWARE }}
+      - name: Organize files
+        id: organize
+        if: steps.compile.outputs.status == 'success' && !cancelled()
+        run: |
+          set -euo pipefail
+          cd openwrt/bin/targets/*/*
+          rm -rf packages
+          echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+          echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: 生成标志
-      id: tag
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
-      run: |
-        RANDOM_CODE="${{ steps.random.outputs.random_code }}"
-        echo "release_tag=immortalwrt_x86_64_${{ env.date_tag }}_build${{ github.run_number }}_${RANDOM_CODE}" >> $GITHUB_OUTPUT
-        echo "release_name=immortalwrt_x86_64_${{ env.date_tag }}_build${{ github.run_number }}" >> $GITHUB_OUTPUT
-        cat > release.txt << EOF
-        ### 🎉 固件信息
-        - 🍁 平台架构: ${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}
-        - 🌳 固件源码: ${{ env.REPO_URL }}
-        - 📂 源码分支: ${{ env.REPO_BRANCH }}
-        - 📡 内核版本: ${{ env.KERNEL_VER }}
-        - 🌐 默认地址: 192.168.1.1
-        - 🔒 默认密码: password
-        ### 🎮固件版本
-        - 固件编译前最后一次 [主源码](${{ env.REPO_URL }}) 更新记录
-        - ${{ env.COMMIT_DATE }}
-        - ${{ env.COMMIT_MESSAGE }}
-        - ${{ env.COMMIT_HASH }}
-        - ${{ env.COMMIT_AUTHOR }}
-        EOF
-        echo "status=success" >> $GITHUB_OUTPUT
+      - name: Upload firmware directory
+        uses: actions/upload-artifact@v7
+        if: steps.organize.outputs.status == 'success' && !cancelled()
+        with:
+          name: firmware-${{ matrix.id }}
+          path: ${{ env.FIRMWARE }}
 
-    - name: 发布标签
-      uses: softprops/action-gh-release@v1
-      if: steps.tag.outputs.status == 'success' && !cancelled()
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        files: ${{ env.FIRMWARE }}/*
-        name: ${{ steps.tag.outputs.release_name }}
-        tag_name: ${{ steps.tag.outputs.release_tag }}
-        body_path: release.txt
+      - name: Generate release metadata
+        id: meta
+        if: steps.organize.outputs.status == 'success' && !cancelled()
+        run: |
+          set -euo pipefail
+          echo "tag=${{ matrix.id }}-$(date +%Y.%m.%d-%H%M)" >> $GITHUB_OUTPUT
+          {
+            echo "Unofficial automated build. Not affiliated with, endorsed by, or reviewed by upstream."
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Source | [${{ matrix.title }}](${{ matrix.repo }}) |"
+            echo "| Branch | \`${{ matrix.branch }}\` |"
+            echo "| Commit | [\`${{ matrix.sha }}\`](${{ matrix.repo }}/commit/${{ matrix.sha }}) |"
+            echo "| Target | x86_64 generic, EFI |"
+            echo "| Built | $(date -u '+%Y-%m-%d %H:%M UTC') |"
+          } > release.md
+          echo "status=success" >> $GITHUB_OUTPUT
+
+      - name: Upload firmware to release
+        uses: softprops/action-gh-release@v3
+        if: steps.meta.outputs.status == 'success' && !cancelled()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ matrix.title }} ${{ steps.meta.outputs.tag }}
+          body_path: release.md
+          prerelease: true
+          files: ${{ env.FIRMWARE }}/*
+
+      - name: Remove old releases for this source
+        if: steps.meta.outputs.status == 'success' && !cancelled()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName,createdAt \
+            --jq 'sort_by(.createdAt) | reverse | map(select(.tagName | startswith("${{ matrix.id }}-"))) | .[3:] | .[].tagName' \
+          | while read -r tag; do
+              [ -n "$tag" ] || continue
+              echo "Deleting release $tag"
+              gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
+            done
+
+      - name: Record built commit
+        if: steps.meta.outputs.status == 'success' && !cancelled()
+        run: |
+          mkdir -p lockbit
+          echo '${{ matrix.id }} ${{ matrix.sha }}' > "lockbit/${{ matrix.id }}.txt"
+
+      - name: Upload built commit
+        uses: actions/upload-artifact@v7
+        if: steps.meta.outputs.status == 'success' && !cancelled()
+        with:
+          name: upstream-${{ matrix.id }}
+          path: lockbit/${{ matrix.id }}.txt
+          retention-days: 1
+
+  record:
+    needs: [check-upstream, build]
+    # always(): a source that failed must still leave the other three recorded.
+    if: always() && needs.check-upstream.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Collect built commits
+        uses: actions/download-artifact@v8
+        with:
+          pattern: upstream-*
+          path: lockbits
+          merge-multiple: true
+        continue-on-error: true
+
+      - name: Advance the lock for sources that actually built
+        run: |
+          set -euo pipefail
+
+          # A build window is hours long, so main has very likely moved since
+          # this job checked out. Rebuild the lock on top of whatever main is
+          # now and retry, rather than pushing a stale ref and failing.
+          # lockbits/ is untracked, so `reset --hard` leaves it alone.
+          for attempt in 1 2 3; do
+            git fetch -q origin main
+            git reset -q --hard origin/main
+
+            [ -s upstream.lock ] || echo '{}' > upstream.lock
+            lock="$(cat upstream.lock)"
+            shopt -s nullglob
+            for f in lockbits/*.txt; do
+              id="$(cut -d' ' -f1 "$f")"
+              sha="$(cut -d' ' -f2 "$f")"
+              echo "recording $id -> ${sha:0:12}"
+              lock="$(printf '%s' "$lock" | jq --arg i "$id" --arg s "$sha" '.[$i] = $s')"
+            done
+            printf '%s\n' "$lock" | jq -S . > upstream.lock
+
+            # A source whose build failed keeps its old SHA on purpose: the next
+            # scheduled run then retries it instead of skipping it as "unchanged".
+            if [ -z "$(git status --porcelain upstream.lock)" ]; then
+              echo 'lock already up to date'
+              exit 0
+            fi
+
+            git config user.name  'github-actions[bot]'
+            git config user.email 'github-actions[bot]@users.noreply.github.com'
+            git add upstream.lock
+            git commit -q -m 'Record upstream commits for successful builds'
+            if git push -q; then
+              echo 'lock pushed'
+              exit 0
+            fi
+            echo "push rejected, retrying ($attempt/3)"
+            sleep 5
+          done
+
+          echo '::error::could not push upstream.lock after 3 attempts'
+          exit 1
