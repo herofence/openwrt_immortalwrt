@@ -141,7 +141,7 @@ jobs:
             echo "| Target | x86_64 generic, EFI |"
             echo "| Built | $(date -u '+%Y-%m-%d %H:%M UTC') |"
             echo
-            echo "## 📒固件信息"
+            echo "📒固件信息"
             echo
             echo "💻| 项目 | 内容 |"
             echo "⚽|---|---|"
