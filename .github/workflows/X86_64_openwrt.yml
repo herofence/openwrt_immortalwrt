@@ -60,9 +60,9 @@ jobs:
       - name: Load custom feeds
         run: |
           set -euo pipefail
-          chmod +x scripts/diy-immortalwrt-part1.sh
+          chmod +x scripts/diy-part1.sh
           cd openwrt
-          "$GITHUB_WORKSPACE/scripts/diy-immortalwrt-part1.sh"
+          "$GITHUB_WORKSPACE/scripts/diy-part1.sh"
           echo '--- feeds.conf.default ---'
           cat feeds.conf.default
 
@@ -75,7 +75,7 @@ jobs:
       - name: Load custom configuration
         run: |
           set -euo pipefail
-          cp config/immortalwrt.config openwrt/.config
+          cp configs/X86.config openwrt/.config
           chmod +x scripts/diy-part2.sh
           cd openwrt
           "$GITHUB_WORKSPACE/scripts/diy-part2.sh"
