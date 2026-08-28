@@ -1,4 +1,4 @@
-name: Autobuild ImmortalWrt
+name: ImmortalWrt_X86
 
 on:
   schedule:
