@@ -18,90 +18,9 @@ env:
   TZ: Asia/Shanghai
 
 jobs:
-  check-upstream:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.resolve.outputs.matrix }}
-      any: ${{ steps.resolve.outputs.any }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Create sources.json
-        run: |
-          printf '%s\n' \
-            '[' \
-            '  {' \
-            '    "id": "immortalwrt",' \
-            '    "title": "ImmortalWrt",' \
-            '    "repo": "https://github.com/immortalwrt/immortalwrt",' \
-            '    "branch": "master",' \
-            '    "config": "config/immortalwrt.config",' \
-            '    "diy1": "scripts/diy-immortalwrt-part1.sh"' \
-            '  }' \
-            ']' > sources.json
-
-      - name: Create resolve-upstream.sh
-        run: |
-          printf '%s\n' \
-            '#!/usr/bin/env bash' \
-            'set -euo pipefail' \
-            '' \
-            'LOCK="upstream.lock"' \
-            'FORCE="${FORCE:-false}"' \
-            '' \
-            '[ -s "$LOCK" ] || echo "{}" > "$LOCK"' \
-            '' \
-            'new_lock="$(cat "$LOCK")"' \
-            'include="[]"' \
-            '' \
-            'for id in $(jq -r ".[].id" sources.json); do' \
-            '  src="$(jq -c --arg i "$id" ".[] | select(.id == $i)" sources.json)"' \
-            '  repo="$(printf "%s" "$src" | jq -r .repo)"' \
-            '  branch="$(printf "%s" "$src" | jq -r .branch)"' \
-            '' \
-            '  sha="$(git ls-remote "$repo" "refs/heads/$branch" | cut -f1)"' \
-            '  if [ -z "$sha" ]; then' \
-            '    echo "::error::cannot resolve $repo branch $branch"' \
-            '    exit 1' \
-            '  fi' \
-            '' \
-            '  old="$(jq -r --arg i "$id" ".[$i] // \"\"" "$LOCK")"' \
-            '  if [ "$sha" = "$old" ] && [ "$FORCE" != "true" ]; then' \
-            '    echo "$id: unchanged (${sha:0:12})"' \
-            '    continue' \
-            '  fi' \
-            '' \
-            '  echo "$id: ${old:0:12}${old:+ -> }${sha:0:12}"' \
-            '  new_lock="$(printf "%s" "$new_lock" | jq --arg i "$id" --arg s "$sha" ".[$i] = $s")"' \
-            '  include="$(printf "%s" "$include" | jq -c --argjson s "$src" --arg sha "$sha" ". + [\$s + {sha: \$sha}]")"' \
-            'done' \
-            '' \
-            'printf "%s\n" "$new_lock" | jq -S . > upstream.lock.next' \
-            '' \
-            'count="$(printf "%s" "$include" | jq "length")"' \
-            '{' \
-            '  echo "matrix=$(printf "%s" "$include" | jq -c "{include: .}")"' \
-            '  echo "any=$([ "$count" -gt 0 ] && echo true || echo false)"' \
-            '} >> "${GITHUB_OUTPUT:-/dev/stdout}"' \
-            '' \
-            'echo "$count source(s) to build"' > resolve-upstream.sh
-          chmod +x resolve-upstream.sh
-
-      - name: Resolve upstream heads
-        id: resolve
-        env:
-          FORCE: ${{ inputs.force_build }}
-        run: ./resolve-upstream.sh
-
   build:
-    needs: check-upstream
-    if: needs.check-upstream.outputs.any == 'true'
     runs-on: ubuntu-22.04
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.check-upstream.outputs.matrix) }}
-    name: build (${{ matrix.id }})
+    name: build ImmortalWrt
 
     steps:
       - name: Checkout
@@ -128,27 +47,22 @@ jobs:
           sudo mkdir -p /workdir
           sudo chown $USER:$GROUPS /workdir
 
-      - name: Clone source code
+      - name: Clone ImmortalWrt source code
         working-directory: /workdir
         run: |
           set -euo pipefail
           df -hT $PWD
-          git clone --depth 1 --branch '${{ matrix.branch }}' '${{ matrix.repo }}' openwrt
+          git clone --depth 1 --branch master https://github.com/immortalwrt/immortalwrt openwrt
           cd openwrt
-          head="$(git rev-parse HEAD)"
-          if [ "$head" != '${{ matrix.sha }}' ]; then
-            git fetch --depth 1 origin '${{ matrix.sha }}'
-            git checkout --detach '${{ matrix.sha }}'
-          fi
-          git --no-pager log -1 --format='pinned at %H (%ad)'
+          git --no-pager log -1 --format='cloned at %H (%ad)'
           ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
       - name: Load custom feeds
         run: |
           set -euo pipefail
-          chmod +x '${{ matrix.diy1 }}'
+          chmod +x scripts/diy-immortalwrt-part1.sh
           cd openwrt
-          "$GITHUB_WORKSPACE/${{ matrix.diy1 }}"
+          "$GITHUB_WORKSPACE/scripts/diy-immortalwrt-part1.sh"
           echo '--- feeds.conf.default ---'
           cat feeds.conf.default
 
@@ -161,7 +75,7 @@ jobs:
       - name: Load custom configuration
         run: |
           set -euo pipefail
-          cp '${{ matrix.config }}' openwrt/.config
+          cp config/immortalwrt.config openwrt/.config
           chmod +x scripts/diy-part2.sh
           cd openwrt
           "$GITHUB_WORKSPACE/scripts/diy-part2.sh"
@@ -186,7 +100,7 @@ jobs:
         uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: build-logs-${{ matrix.id }}
+          name: build-logs-immortalwrt
           path: openwrt/logs
           if-no-files-found: ignore
           retention-days: 30
@@ -209,7 +123,7 @@ jobs:
         uses: actions/upload-artifact@v7
         if: steps.organize.outputs.status == 'success' && !cancelled()
         with:
-          name: firmware-${{ matrix.id }}
+          name: firmware-immortalwrt
           path: ${{ env.FIRMWARE }}
 
       - name: Generate release metadata
@@ -217,15 +131,14 @@ jobs:
         if: steps.organize.outputs.status == 'success' && !cancelled()
         run: |
           set -euo pipefail
-          echo "tag=${{ matrix.id }}-$(date +%Y.%m.%d-%H%M)" >> $GITHUB_OUTPUT
+          echo "tag=immortalwrt-$(date +%Y.%m.%d-%H%M)" >> $GITHUB_OUTPUT
           {
             echo "Unofficial automated build. Not affiliated with, endorsed by, or reviewed by upstream."
             echo
             echo "| | |"
             echo "|---|---|"
-            echo "| Source | [${{ matrix.title }}](${{ matrix.repo }}) |"
-            echo "| Branch | \`${{ matrix.branch }}\` |"
-            echo "| Commit | [\`${{ matrix.sha }}\`](${{ matrix.repo }}/commit/${{ matrix.sha }}) |"
+            echo "| Source | [ImmortalWrt](https://github.com/immortalwrt/immortalwrt) |"
+            echo "| Branch | \`master\` |"
             echo "| Target | x86_64 generic, EFI |"
             echo "| Built | $(date -u '+%Y-%m-%d %H:%M UTC') |"
           } > release.md
@@ -238,89 +151,20 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
-          name: ${{ matrix.title }} ${{ steps.meta.outputs.tag }}
+          name: ImmortalWrt ${{ steps.meta.outputs.tag }}
           body_path: release.md
           prerelease: true
           files: ${{ env.FIRMWARE }}/*
 
-      - name: Remove old releases for this source
+      - name: Remove old releases for ImmortalWrt
         if: steps.meta.outputs.status == 'success' && !cancelled()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName,createdAt \
-            --jq 'sort_by(.createdAt) | reverse | map(select(.tagName | startswith("${{ matrix.id }}-"))) | .[3:] | .[].tagName' \
+            --jq 'sort_by(.createdAt) | reverse | map(select(.tagName | startswith("immortalwrt-"))) | .[3:] | .[].tagName' \
           | while read -r tag; do
               [ -n "$tag" ] || continue
               echo "Deleting release $tag"
               gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
             done
-
-      - name: Record built commit
-        if: steps.meta.outputs.status == 'success' && !cancelled()
-        run: |
-          mkdir -p lockbit
-          echo '${{ matrix.id }} ${{ matrix.sha }}' > "lockbit/${{ matrix.id }}.txt"
-
-      - name: Upload built commit
-        uses: actions/upload-artifact@v7
-        if: steps.meta.outputs.status == 'success' && !cancelled()
-        with:
-          name: upstream-${{ matrix.id }}
-          path: lockbit/${{ matrix.id }}.txt
-          retention-days: 1
-
-  record:
-    needs: [check-upstream, build]
-    if: always() && needs.check-upstream.outputs.any == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Collect built commits
-        uses: actions/download-artifact@v8
-        with:
-          pattern: upstream-*
-          path: lockbits
-          merge-multiple: true
-        continue-on-error: true
-
-      - name: Advance the lock for sources that actually built
-        run: |
-          set -euo pipefail
-
-          for attempt in 1 2 3; do
-            git fetch -q origin main
-            git reset -q --hard origin/main
-
-            [ -s upstream.lock ] || echo '{}' > upstream.lock
-            lock="$(cat upstream.lock)"
-            shopt -s nullglob
-            for f in lockbits/*.txt; do
-              id="$(cut -d' ' -f1 "$f")"
-              sha="$(cut -d' ' -f2 "$f")"
-              echo "recording $id -> ${sha:0:12}"
-              lock="$(printf '%s' "$lock" | jq --arg i "$id" --arg s "$sha" '.[$i] = $s')"
-            done
-            printf '%s\n' "$lock" | jq -S . > upstream.lock
-
-            if [ -z "$(git status --porcelain upstream.lock)" ]; then
-              echo 'lock already up to date'
-              exit 0
-            fi
-
-            git config user.name  'github-actions[bot]'
-            git config user.email 'github-actions[bot]@users.noreply.github.com'
-            git add upstream.lock
-            git commit -q -m 'Record upstream commits for successful builds'
-            if git push -q; then
-              echo 'lock pushed'
-              exit 0
-            fi
-            echo "push rejected, retrying ($attempt/3)"
-            sleep 5
-          done
-
-          echo '::error::could not push upstream.lock after 3 attempts'
-          exit 1
