@@ -344,5 +344,5 @@ jobs:
             sleep 5
           done
 
-          echo '::error::could not push upstream.lock after 3 attempts'
+          echo '::error::could not push upstream.lock after 30 attempts'
           exit 1
