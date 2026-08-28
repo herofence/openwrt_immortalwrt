@@ -1,4 +1,4 @@
-name: ImmortalWrt_X86
+name: Autobuild ImmortalWrt
 
 on:
   schedule:
@@ -36,11 +36,11 @@ jobs:
               "title": "ImmortalWrt",
               "repo": "https://github.com/immortalwrt/immortalwrt",
               "branch": "master",
-              "config": "configs/X86.config",
-              "diy1": "scripts/diy-part1.sh"
+              "config": "config/immortalwrt.config",
+              "diy1": "scripts/diy-immortalwrt-part1.sh"
             }
           ]
-          EOF
+EOF
 
       - name: Create resolve-upstream.sh (embedded)
         run: |
@@ -87,7 +87,7 @@ jobs:
           } >> "${GITHUB_OUTPUT:-/dev/stdout}"
 
           echo "$count source(s) to build"
-          EOF
+EOF
           chmod +x resolve-upstream.sh
 
       - name: Initialize upstream.lock if absent (embedded)
@@ -97,7 +97,7 @@ jobs:
             {
               "immortalwrt": "4d6ffcdfd95285b84d2ff810198119a8fc0ad6d2"
             }
-            EOF
+EOF
           fi
 
       - name: Resolve upstream heads
@@ -297,7 +297,7 @@ jobs:
             {
               "immortalwrt": "4d6ffcdfd95285b84d2ff810198119a8fc0ad6d2"
             }
-            EOF
+EOF
           fi
 
       - name: Collect built commits
@@ -344,5 +344,5 @@ jobs:
             sleep 5
           done
 
-          echo '::error::could not push upstream.lock after 30 attempts'
+          echo '::error::could not push upstream.lock after 3 attempts'
           exit 1
