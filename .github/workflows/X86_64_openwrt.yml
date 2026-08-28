@@ -1,19 +1,15 @@
-name: Autobuild OpenWrt
+name: ImmortalWrt_X86
 
 on:
   schedule:
-    - cron: '0 18 1,15 * *' # 2nd and 16th at 2:00 AM UTC+8
+    - cron: '0 18 1,15 * *' # 每月2日和16日 UTC+8 02:00
   workflow_dispatch:
     inputs:
       force_build:
-        description: 'Build every source even if upstream has not moved'
+        description: 'Build even if upstream has not moved'
         required: false
         type: boolean
         default: false
-      only:
-        description: "Comma-separated source ids, e.g. 'lede,openwrt' (default: all)"
-        required: false
-        default: ''
 
 permissions:
   contents: write
@@ -31,18 +27,89 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Create sources.json (embedded)
+        run: |
+          cat > sources.json <<'EOF'
+          [
+            {
+              "id": "immortalwrt",
+              "title": "ImmortalWrt",
+              "repo": "https://github.com/immortalwrt/immortalwrt",
+              "branch": "master",
+              "config": "config/immortalwrt.config",
+              "diy1": "scripts/diy-immortalwrt-part1.sh"
+            }
+          ]
+          EOF
+
+      - name: Create resolve-upstream.sh (embedded)
+        run: |
+          cat > resolve-upstream.sh <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          LOCK="upstream.lock"
+          FORCE="${FORCE:-false}"
+
+          [ -s "$LOCK" ] || echo '{}' > "$LOCK"
+
+          new_lock="$(cat "$LOCK")"
+          include='[]'
+
+          for id in $(jq -r '.[].id' sources.json); do
+            src="$(jq -c --arg i "$id" '.[] | select(.id == $i)' sources.json)"
+            repo="$(printf '%s' "$src" | jq -r .repo)"
+            branch="$(printf '%s' "$src" | jq -r .branch)"
+
+            sha="$(git ls-remote "$repo" "refs/heads/$branch" | cut -f1)"
+            if [ -z "$sha" ]; then
+              echo "::error::cannot resolve $repo branch $branch"
+              exit 1
+            fi
+
+            old="$(jq -r --arg i "$id" '.[$i] // ""' "$LOCK")"
+            if [ "$sha" = "$old" ] && [ "$FORCE" != "true" ]; then
+              echo "$id: unchanged (${sha:0:12})"
+              continue
+            fi
+
+            echo "$id: ${old:0:12}${old:+ -> }${sha:0:12}"
+            new_lock="$(printf '%s' "$new_lock" | jq --arg i "$id" --arg s "$sha" '.[$i] = $s')"
+            include="$(printf '%s' "$include" | jq -c --argjson s "$src" --arg sha "$sha" '. + [$s + {sha: $sha}]')"
+          done
+
+          printf '%s\n' "$new_lock" | jq -S . > upstream.lock.next
+
+          count="$(printf '%s' "$include" | jq 'length')"
+          {
+            echo "matrix=$(printf '%s' "$include" | jq -c '{include: .}')"
+            echo "any=$([ "$count" -gt 0 ] && echo true || echo false)"
+          } >> "${GITHUB_OUTPUT:-/dev/stdout}"
+
+          echo "$count source(s) to build"
+          EOF
+          chmod +x resolve-upstream.sh
+
+      - name: Initialize upstream.lock if absent (embedded)
+        run: |
+          if [ ! -s upstream.lock ]; then
+            cat > upstream.lock <<'EOF'
+            {
+              "immortalwrt": "4d6ffcdfd95285b84d2ff810198119a8fc0ad6d2"
+            }
+            EOF
+          fi
+
       - name: Resolve upstream heads
         id: resolve
         env:
           FORCE: ${{ inputs.force_build }}
-          ONLY: ${{ inputs.only }}
-        run: ./scripts/resolve-upstream.sh
+        run: ./resolve-upstream.sh
 
   build:
     needs: check-upstream
     if: needs.check-upstream.outputs.any == 'true'
     runs-on: ubuntu-22.04
-    # One source failing must not hide the state of the other three.
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.check-upstream.outputs.matrix) }}
@@ -58,21 +125,7 @@ jobs:
         run: |
           sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           sudo docker image prune --all --force
-
-          # moby's hack/make/binary-daemon copies host binaries into the bundle
-          # whenever /usr/local/bin/runc exists. The runner ships runc but has
-          # no docker-init, rootlesskit or dockerd-rootless.sh, so `command -v`
-          # returns empty and the build dies with "cp: cannot stat ''", taking
-          # the dockerd package with it. Deleting runc makes the copy return
-          # early; docker-proxy still comes from the separate binary-proxy
-          # target, so nothing the package installs is lost.
           sudo rm -f /usr/local/bin/runc
-
-          # Do not reach for a dependency list over the network. The upstream
-          # template used `curl -fsSL git.io/depends-ubuntu-1804`; git.io shut
-          # down in 2022, curl -f exited non-zero, and `apt-get install` with no
-          # arguments exits 0 -- so the step stayed green while every build ran
-          # without its dependencies.
           sudo -E apt-get -qq update
           sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
             bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git \
@@ -96,8 +149,6 @@ jobs:
           cd openwrt
           head="$(git rev-parse HEAD)"
           if [ "$head" != '${{ matrix.sha }}' ]; then
-            # Upstream moved between resolve and clone. Pin to the SHA the
-            # release will claim, so the two can never disagree.
             git fetch --depth 1 origin '${{ matrix.sha }}'
             git checkout --detach '${{ matrix.sha }}'
           fi
@@ -233,12 +284,21 @@ jobs:
 
   record:
     needs: [check-upstream, build]
-    # always(): a source that failed must still leave the other three recorded.
     if: always() && needs.check-upstream.outputs.any == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Initialize upstream.lock if absent (embedded)
+        run: |
+          if [ ! -s upstream.lock ]; then
+            cat > upstream.lock <<'EOF'
+            {
+              "immortalwrt": "4d6ffcdfd95285b84d2ff810198119a8fc0ad6d2"
+            }
+            EOF
+          fi
 
       - name: Collect built commits
         uses: actions/download-artifact@v8
@@ -252,10 +312,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          # A build window is hours long, so main has very likely moved since
-          # this job checked out. Rebuild the lock on top of whatever main is
-          # now and retry, rather than pushing a stale ref and failing.
-          # lockbits/ is untracked, so `reset --hard` leaves it alone.
           for attempt in 1 2 3; do
             git fetch -q origin main
             git reset -q --hard origin/main
@@ -271,8 +327,6 @@ jobs:
             done
             printf '%s\n' "$lock" | jq -S . > upstream.lock
 
-            # A source whose build failed keeps its old SHA on purpose: the next
-            # scheduled run then retries it instead of skipping it as "unchanged".
             if [ -z "$(git status --porcelain upstream.lock)" ]; then
               echo 'lock already up to date'
               exit 0
