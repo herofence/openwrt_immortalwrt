@@ -145,7 +145,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
-          name: ImmortalWrt ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.tag }}
           body_path: release.md
           prerelease: true
           files: ${{ env.FIRMWARE }}/*
