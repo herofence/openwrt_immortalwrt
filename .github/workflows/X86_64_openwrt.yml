@@ -36,8 +36,8 @@ jobs:
               "title": "ImmortalWrt",
               "repo": "https://github.com/immortalwrt/immortalwrt",
               "branch": "master",
-              "config": "config/immortalwrt.config",
-              "diy1": "scripts/diy-immortalwrt-part1.sh"
+              "config": "configs/X86.config",
+              "diy1": "scripts/diy-part1.sh"
             }
           ]
           EOF
