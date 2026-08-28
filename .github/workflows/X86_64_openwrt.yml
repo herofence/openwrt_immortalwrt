@@ -1,4 +1,4 @@
-name: ImmortalWrt_x86
+name: Autobuild ImmortalWrt
 
 on:
   schedule:
@@ -27,78 +27,66 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Create sources.json (embedded)
+      - name: Create sources.json
         run: |
-          cat > sources.json <<'EOF'
-          [
-            {
-              "id": "immortalwrt",
-              "title": "ImmortalWrt",
-              "repo": "https://github.com/immortalwrt/immortalwrt",
-              "branch": "master",
-              "config": "config/immortalwrt.config",
-              "diy1": "scripts/diy-immortalwrt-part1.sh"
-            }
-          ]
-          EOF
+          printf '%s\n' \
+            '[' \
+            '  {' \
+            '    "id": "immortalwrt",' \
+            '    "title": "ImmortalWrt",' \
+            '    "repo": "https://github.com/immortalwrt/immortalwrt",' \
+            '    "branch": "master",' \
+            '    "config": "config/immortalwrt.config",' \
+            '    "diy1": "scripts/diy-immortalwrt-part1.sh"' \
+            '  }' \
+            ']' > sources.json
 
-      - name: Create resolve-upstream.sh (embedded)
+      - name: Create resolve-upstream.sh
         run: |
-          cat > resolve-upstream.sh <<'EOF'
-          #!/usr/bin/env bash
-          set -euo pipefail
-
-          LOCK="upstream.lock"
-          FORCE="${FORCE:-false}"
-
-          [ -s "$LOCK" ] || echo '{}' > "$LOCK"
-
-          new_lock="$(cat "$LOCK")"
-          include='[]'
-
-          for id in $(jq -r '.[].id' sources.json); do
-            src="$(jq -c --arg i "$id" '.[] | select(.id == $i)' sources.json)"
-            repo="$(printf '%s' "$src" | jq -r .repo)"
-            branch="$(printf '%s' "$src" | jq -r .branch)"
-
-            sha="$(git ls-remote "$repo" "refs/heads/$branch" | cut -f1)"
-            if [ -z "$sha" ]; then
-              echo "::error::cannot resolve $repo branch $branch"
-              exit 1
-            fi
-
-            old="$(jq -r --arg i "$id" '.[$i] // ""' "$LOCK")"
-            if [ "$sha" = "$old" ] && [ "$FORCE" != "true" ]; then
-              echo "$id: unchanged (${sha:0:12})"
-              continue
-            fi
-
-            echo "$id: ${old:0:12}${old:+ -> }${sha:0:12}"
-            new_lock="$(printf '%s' "$new_lock" | jq --arg i "$id" --arg s "$sha" '.[$i] = $s')"
-            include="$(printf '%s' "$include" | jq -c --argjson s "$src" --arg sha "$sha" '. + [$s + {sha: $sha}]')"
-          done
-
-          printf '%s\n' "$new_lock" | jq -S . > upstream.lock.next
-
-          count="$(printf '%s' "$include" | jq 'length')"
-          {
-            echo "matrix=$(printf '%s' "$include" | jq -c '{include: .}')"
-            echo "any=$([ "$count" -gt 0 ] && echo true || echo false)"
-          } >> "${GITHUB_OUTPUT:-/dev/stdout}"
-
-          echo "$count source(s) to build"
-          EOF
+          printf '%s\n' \
+            '#!/usr/bin/env bash' \
+            'set -euo pipefail' \
+            '' \
+            'LOCK="upstream.lock"' \
+            'FORCE="${FORCE:-false}"' \
+            '' \
+            '[ -s "$LOCK" ] || echo "{}" > "$LOCK"' \
+            '' \
+            'new_lock="$(cat "$LOCK")"' \
+            'include="[]"' \
+            '' \
+            'for id in $(jq -r ".[].id" sources.json); do' \
+            '  src="$(jq -c --arg i "$id" ".[] | select(.id == $i)" sources.json)"' \
+            '  repo="$(printf "%s" "$src" | jq -r .repo)"' \
+            '  branch="$(printf "%s" "$src" | jq -r .branch)"' \
+            '' \
+            '  sha="$(git ls-remote "$repo" "refs/heads/$branch" | cut -f1)"' \
+            '  if [ -z "$sha" ]; then' \
+            '    echo "::error::cannot resolve $repo branch $branch"' \
+            '    exit 1' \
+            '  fi' \
+            '' \
+            '  old="$(jq -r --arg i "$id" ".[$i] // \"\"" "$LOCK")"' \
+            '  if [ "$sha" = "$old" ] && [ "$FORCE" != "true" ]; then' \
+            '    echo "$id: unchanged (${sha:0:12})"' \
+            '    continue' \
+            '  fi' \
+            '' \
+            '  echo "$id: ${old:0:12}${old:+ -> }${sha:0:12}"' \
+            '  new_lock="$(printf "%s" "$new_lock" | jq --arg i "$id" --arg s "$sha" ".[$i] = $s")"' \
+            '  include="$(printf "%s" "$include" | jq -c --argjson s "$src" --arg sha "$sha" ". + [\$s + {sha: \$sha}]")"' \
+            'done' \
+            '' \
+            'printf "%s\n" "$new_lock" | jq -S . > upstream.lock.next' \
+            '' \
+            'count="$(printf "%s" "$include" | jq "length")"' \
+            '{' \
+            '  echo "matrix=$(printf "%s" "$include" | jq -c "{include: .}")"' \
+            '  echo "any=$([ "$count" -gt 0 ] && echo true || echo false)"' \
+            '} >> "${GITHUB_OUTPUT:-/dev/stdout}"' \
+            '' \
+            'echo "$count source(s) to build"' > resolve-upstream.sh
           chmod +x resolve-upstream.sh
-
-      - name: Initialize upstream.lock if absent (embedded)
-        run: |
-          if [ ! -s upstream.lock ]; then
-            cat > upstream.lock <<'EOF'
-            {
-              "immortalwrt": "4d6ffcdfd95285b84d2ff810198119a8fc0ad6d2"
-            }
-            EOF
-          fi
 
       - name: Resolve upstream heads
         id: resolve
@@ -289,16 +277,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-
-      - name: Initialize upstream.lock if absent (embedded)
-        run: |
-          if [ ! -s upstream.lock ]; then
-            cat > upstream.lock <<'EOF'
-            {
-              "immortalwrt": "4d6ffcdfd95285b84d2ff810198119a8fc0ad6d2"
-            }
-            EOF
-          fi
 
       - name: Collect built commits
         uses: actions/download-artifact@v8
