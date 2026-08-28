@@ -3,13 +3,7 @@ name: ImmortalWrt_X86
 on:
   schedule:
     - cron: '0 18 1,15 * *' # 每月2日和16日 UTC+8 02:00
-  workflow_dispatch:
-    inputs:
-      force_build:
-        description: 'Build even if upstream has not moved'
-        required: false
-        type: boolean
-        default: false
+  workflow_dispatch: # 手动触发，无输入参数
 
 permissions:
   contents: write
@@ -20,13 +14,13 @@ env:
 jobs:
   build:
     runs-on: ubuntu-22.04
-    name: build ImmortalWrt
+    name: 编译 ImmortalWrt
 
     steps:
-      - name: Checkout
+      - name: 检出仓库代码
         uses: actions/checkout@v5
 
-      - name: Initialization environment
+      - name: 初始化编译环境
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
@@ -47,7 +41,7 @@ jobs:
           sudo mkdir -p /workdir
           sudo chown $USER:$GROUPS /workdir
 
-      - name: Clone ImmortalWrt source code
+      - name: 克隆 ImmortalWrt 源码
         working-directory: /workdir
         run: |
           set -euo pipefail
@@ -57,7 +51,7 @@ jobs:
           git --no-pager log -1 --format='cloned at %H (%ad)'
           ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-      - name: Load custom feeds
+      - name: 加载自定义软件源
         run: |
           set -euo pipefail
           chmod +x scripts/diy-part1.sh
@@ -66,13 +60,13 @@ jobs:
           echo '--- feeds.conf.default ---'
           cat feeds.conf.default
 
-      - name: Update feeds
+      - name: 更新软件源
         run: cd openwrt && ./scripts/feeds update -a
 
-      - name: Install feeds
+      - name: 安装软件包
         run: cd openwrt && ./scripts/feeds install -a
 
-      - name: Load custom configuration
+      - name: 加载自定义配置
         run: |
           set -euo pipefail
           cp configs/X86.config openwrt/.config
@@ -80,7 +74,7 @@ jobs:
           cd openwrt
           "$GITHUB_WORKSPACE/scripts/diy-part2.sh"
 
-      - name: Download package
+      - name: 下载编译所需源码包
         run: |
           cd openwrt
           make defconfig
@@ -88,7 +82,7 @@ jobs:
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
 
-      - name: Compile the firmware
+      - name: 编译固件
         id: compile
         run: |
           cd openwrt
@@ -96,7 +90,7 @@ jobs:
           make -j$(nproc) || make -j1 || make -j1 V=s
           echo "status=success" >> $GITHUB_OUTPUT
 
-      - name: Upload build logs
+      - name: 上传编译日志（失败时）
         uses: actions/upload-artifact@v7
         if: failure()
         with:
@@ -105,11 +99,11 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-      - name: Check space usage
+      - name: 检查磁盘空间
         if: (!cancelled())
         run: df -hT
 
-      - name: Organize files
+      - name: 整理固件文件
         id: organize
         if: steps.compile.outputs.status == 'success' && !cancelled()
         run: |
@@ -119,14 +113,14 @@ jobs:
           echo "FIRMWARE=$PWD" >> $GITHUB_ENV
           echo "status=success" >> $GITHUB_OUTPUT
 
-      - name: Upload firmware directory
+      - name: 上传固件目录
         uses: actions/upload-artifact@v7
         if: steps.organize.outputs.status == 'success' && !cancelled()
         with:
           name: firmware-immortalwrt
           path: ${{ env.FIRMWARE }}
 
-      - name: Generate release metadata
+      - name: 生成发布信息
         id: meta
         if: steps.organize.outputs.status == 'success' && !cancelled()
         run: |
@@ -144,7 +138,7 @@ jobs:
           } > release.md
           echo "status=success" >> $GITHUB_OUTPUT
 
-      - name: Upload firmware to release
+      - name: 上传固件到 Release
         uses: softprops/action-gh-release@v3
         if: steps.meta.outputs.status == 'success' && !cancelled()
         env:
@@ -155,16 +149,3 @@ jobs:
           body_path: release.md
           prerelease: true
           files: ${{ env.FIRMWARE }}/*
-
-      - name: Remove old releases for ImmortalWrt
-        if: steps.meta.outputs.status == 'success' && !cancelled()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName,createdAt \
-            --jq 'sort_by(.createdAt) | reverse | map(select(.tagName | startswith("immortalwrt-"))) | .[3:] | .[].tagName' \
-          | while read -r tag; do
-              [ -n "$tag" ] || continue
-              echo "Deleting release $tag"
-              gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
-            done
