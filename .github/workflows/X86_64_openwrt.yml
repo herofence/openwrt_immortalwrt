@@ -1,4 +1,4 @@
-name: ImmortalWrt
+name: ImmortalWrt_x86
 
 on:
   schedule:
@@ -40,7 +40,7 @@ jobs:
               "diy1": "scripts/diy-immortalwrt-part1.sh"
             }
           ]
-EOF
+          EOF
 
       - name: Create resolve-upstream.sh (embedded)
         run: |
@@ -87,7 +87,7 @@ EOF
           } >> "${GITHUB_OUTPUT:-/dev/stdout}"
 
           echo "$count source(s) to build"
-EOF
+          EOF
           chmod +x resolve-upstream.sh
 
       - name: Initialize upstream.lock if absent (embedded)
@@ -97,7 +97,7 @@ EOF
             {
               "immortalwrt": "4d6ffcdfd95285b84d2ff810198119a8fc0ad6d2"
             }
-EOF
+            EOF
           fi
 
       - name: Resolve upstream heads
@@ -297,7 +297,7 @@ EOF
             {
               "immortalwrt": "4d6ffcdfd95285b84d2ff810198119a8fc0ad6d2"
             }
-EOF
+            EOF
           fi
 
       - name: Collect built commits
