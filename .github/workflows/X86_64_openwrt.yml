@@ -1,4 +1,4 @@
-name: Autobuild OpenWrt
+name: immortalwrt_x86_64
 
 on:
   schedule:
