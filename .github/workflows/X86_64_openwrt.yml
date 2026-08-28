@@ -108,7 +108,12 @@ jobs:
         if: steps.compile.outputs.status == 'success' && !cancelled()
         run: |
           set -euo pipefail
-          cd openwrt/bin/targets/*/*
+          FIRMWARE_DIR=$(find openwrt/bin/targets -mindepth 2 -maxdepth 2 -type d | head -n1)
+          if [ -z "$FIRMWARE_DIR" ]; then
+            echo "未找到固件目录！"
+            exit 1
+          fi
+          cd "$FIRMWARE_DIR"
           rm -rf packages
           echo "FIRMWARE=$PWD" >> $GITHUB_ENV
           echo "status=success" >> $GITHUB_OUTPUT
@@ -132,9 +137,20 @@ jobs:
             echo "| | |"
             echo "|---|---|"
             echo "| Source | [ImmortalWrt](https://github.com/immortalwrt/immortalwrt) |"
-            echo "| Branch | \`master\` |"
+            echo "| Branch | \`openwrt-25.12\` |"
             echo "| Target | x86_64 generic, EFI |"
             echo "| Built | $(date -u '+%Y-%m-%d %H:%M UTC') |"
+            echo
+            echo "## 固件信息"
+            echo
+            echo "| 项目 | 内容 |"
+            echo "|---|---|"
+            echo "| 平台架构 | x86-64 |"
+            echo "| 固件源码 | [ImmortalWrt](https://github.com/immortalwrt/immortalwrt) |"
+            echo "| 源码分支 | openwrt-25.12 |"
+            echo "| 内核版本 | 6.12.103~daeb09c9edf469ba6972b6ef8e129d5e |"
+            echo "| 默认地址 | 192.168.2.1 |"
+            echo "| 默认密码 | password |"
           } > release.md
           echo "status=success" >> $GITHUB_OUTPUT
 
