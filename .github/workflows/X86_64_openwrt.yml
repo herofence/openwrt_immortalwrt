@@ -51,9 +51,6 @@ jobs:
           df -hT $PWD
           git clone --depth 1 --branch master https://github.com/immortalwrt/immortalwrt openwrt
           cd openwrt
-          echo 'src-git istore https://github.com/linkease/istore;main' >> feeds.conf.default
-          echo 'src-git nas https://github.com/linkease/nas-packages.git;master' >> feeds.conf.default
-          echo 'src-git nas_luci https://github.com/linkease/nas-packages-luci.git;main' >> feeds.conf.default
           git --no-pager log -1 --format='cloned at %H (%ad)'
           ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
@@ -67,7 +64,9 @@ jobs:
           bash $GITHUB_WORKSPACE/$PRESET_CLASH_SH amd64
           echo '--- feeds.conf.default ---'
           cat feeds.conf.default
-
+          echo 'src-git istore https://github.com/linkease/istore;main' >> feeds.conf.default
+          echo 'src-git nas https://github.com/linkease/nas-packages.git;master' >> feeds.conf.default
+          echo 'src-git nas_luci https://github.com/linkease/nas-packages-luci.git;main' >> feeds.conf.default
       - name: 更新软件源
         run: |
          cd openwrt 
