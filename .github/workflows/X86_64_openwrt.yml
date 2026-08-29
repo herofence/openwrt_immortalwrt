@@ -147,12 +147,12 @@ jobs:
           {
             echo
             echo "📒固件信息"
-            echo "💝平台架构 x86-64"
-            echo "🚀固件源码https://github.com/immortalwrt/immortalwrt"
-            echo "🧊源码分支 openwrt-25.12"
-            echo "🌐默认地址192.168.2.1"
-            echo "🔑默认密码 password"
-            echo "👉时间 $(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M %Z')"           
+            echo "💝平台架构： x86-64"
+            echo "🚀固件源码：https://github.com/immortalwrt/immortalwrt"
+            echo "🧊源码分支：openwrt-25.12"
+            echo "🌐默认地址：192.168.2.1"
+            echo "🔑默认密码：password"
+            echo "👉北京时间：$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M')"           
           } > release.md
           echo "status=success" >> $GITHUB_OUTPUT
 
