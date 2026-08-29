@@ -74,7 +74,7 @@ jobs:
          ./scripts/feeds update -a
          ./scripts/feeds install -a -p nas
          ./scripts/feeds install -a -p nas_luci
-         ./scripts/feeds install -p istore luci-app-store
+         ./scripts/feeds install -d y -p istore luci-app-store
          
       - name: 安装软件包
         run: cd openwrt && ./scripts/feeds install -a
