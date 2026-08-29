@@ -5,7 +5,8 @@ if [ -n "${GITHUB_TOKEN}" ]; then
     git config --global url."https://oauth2:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
 fi
 
-# 2. 清理冲突的主题和应用
+# 2. 更改boot分区大小为1M
+sed -i 's/256/1024/g' target/linux/x86/image/Makefile
 
 # 3. 克隆第三方插件包到 package/community 目录
 mkdir -p package/community
