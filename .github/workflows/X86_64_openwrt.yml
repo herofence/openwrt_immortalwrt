@@ -2,8 +2,8 @@ name: ImmortalWrt_X86
 
 on:
   schedule:
-    - cron: '0 18 1,15 * *' # 每月2日和16日 UTC+8 02:00
-  workflow_dispatch: # 手动触发，无输入参数
+    - cron: '0 18 1,15 * *' 
+  workflow_dispatch: 
 
 permissions:
   contents: write
@@ -164,5 +164,5 @@ jobs:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: ${{ steps.meta.outputs.tag }}
           body_path: release.md
-          prerelease: true
+          prerelease: false
           files: ${{ env.FIRMWARE }}/*
