@@ -61,9 +61,9 @@ jobs:
           set -euo pipefail
           chmod +x scripts/diy-part1.sh
           cd openwrt
+          "$GITHUB_WORKSPACE/scripts/diy-part1.sh"
           bash $GITHUB_WORKSPACE/$THEME_SETTING_SH
           bash $GITHUB_WORKSPACE/$PRESET_CLASH_SH amd64
-          "$GITHUB_WORKSPACE/scripts/diy-part1.sh"
           echo '--- feeds.conf.default ---'
           cat feeds.conf.default
 
