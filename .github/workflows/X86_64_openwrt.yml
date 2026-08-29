@@ -147,7 +147,7 @@ jobs:
           echo "tag=immortalwrt-$(date +%Y.%m.%d-%H%M)" >> $GITHUB_OUTPUT
           {
             echo
-            echo "📒固件信息"
+            echo "🙏本固件包含openclash、IPV6、打印机驱动、Zerotier、Easytier、应用过滤、Docker、Lucky、Istore、AdBlock Fast"
             echo "💝平台架构： x86-64"
             echo "🚀固件源码：https://github.com/immortalwrt/immortalwrt"
             echo "🧊源码分支：openwrt-25.12"
