@@ -1,9 +1,10 @@
 name: ImmortalWrt_X86
 
 on:
+  workflow_dispatch:
   schedule:
-    - cron: '0 18 1,15 * *' 
-  workflow_dispatch: 
+  # 每周四 5:00执行一次
+    - cron: 0 21 * * WED
 
 permissions:
   contents: write
