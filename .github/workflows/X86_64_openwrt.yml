@@ -20,7 +20,7 @@ jobs:
 
     steps:
       - name: 检查仓库代码
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: 初始化编译环境
         env:
