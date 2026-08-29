@@ -6,8 +6,6 @@ if [ -n "${GITHUB_TOKEN}" ]; then
 fi
 
 # 2. 清理冲突的主题和应用
-rm -rf feeds/luci/applications/luci-app-argon-config
-rm -rf feeds/packages/net/v2ray-geodata
 
 # 3. 克隆第三方插件包到 package/community 目录
 mkdir -p package/community
