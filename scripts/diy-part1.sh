@@ -6,14 +6,12 @@ if [ -n "${GITHUB_TOKEN}" ]; then
 fi
 
 # 2. 清理冲突的主题和应用
-rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/packages/net/v2ray-geodata
 
 # 3. 克隆第三方插件包到 package/community 目录
 mkdir -p package/community
 pushd package/community
-
 # 主题与常用应用
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
@@ -27,14 +25,12 @@ git clone --depth=1 -b openwrt-18.06 https://github.com/tty228/luci-app-wechatpu
 git clone --depth=1 https://github.com/ilxp/luci-app-ikoolproxy
 git clone --depth=1 https://github.com/esirplayground/luci-app-poweroff
 git clone --depth=1 https://github.com/Jason6111/luci-app-netdata
-
 # SmartDNS (保留单个官方推荐源)
 git clone --depth=1 https://github.com/pymumu/luci-app-smartdns
-
 # OpenClash
 git clone --depth=1 https://github.com/vernesong/OpenClash.git
-
 popd
+
 # 4. 更改默认主题为 Argon
 sed -i 's/luci-theme-design/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
 sed -i 's/luci-theme-bootstrap/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
