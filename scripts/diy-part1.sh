@@ -48,7 +48,7 @@ elif [ -f "package/lean/default-settings/files/zzz-default-settings" ]; then
     sed -i "s/${orig_version}/R${date_version} by herofence/g" package/lean/default-settings/files/zzz-default-settings
 fi
 
-# 取消主题默认配置覆盖（修正路径）
+# 取消主题默认配置覆盖
 find package/community/luci-theme-* -type f -exec sed -i '/set luci.main.mediaurlbase/d' {} \; 2>/dev/null
 
 echo "脚本执行完成"
