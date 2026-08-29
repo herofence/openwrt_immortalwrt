@@ -4,14 +4,6 @@ if [ -n "${GITHUB_TOKEN}" ]; then
     git config --global url."https://oauth2:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
 fi
 
-# 替换 luci-app-docker 为官方版本
-if [ -d "package/feeds/luci/luci-app-docker" ]; then
-    rm -rf package/feeds/luci/luci-app-docker
-fi
-git clone --depth 1 --branch openwrt-23.05 https://github.com/openwrt/luci.git /tmp/luci-official
-cp -r /tmp/luci-official/applications/luci-app-docker package/feeds/luci/
-rm -rf /tmp/luci-official
-
 # 克隆第三方插件包到 package/community，隔离核心包目录
 mkdir -p package/community
 pushd package/community
