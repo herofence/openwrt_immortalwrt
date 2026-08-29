@@ -9,6 +9,8 @@ permissions:
   contents: write
 
 env:
+  THEME_SETTING_SH: scripts/theme-setting.sh
+  PRESET_CLASH_SH: scripts/preset-clash-core.sh
   TZ: Asia/Shanghai
 
 jobs:
@@ -47,6 +49,9 @@ jobs:
           set -euo pipefail
           df -hT $PWD
           git clone --depth 1 --branch master https://github.com/immortalwrt/immortalwrt openwrt
+          echo 'src-git istore https://github.com/linkease/istore;main' >> feeds.conf.default
+          echo 'src-git nas https://github.com/linkease/nas-packages.git;master' >> feeds.conf.default
+          echo 'src-git nas_luci https://github.com/linkease/nas-packages-luci.git;main' >> feeds.conf.default
           cd openwrt
           git --no-pager log -1 --format='cloned at %H (%ad)'
           ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
@@ -56,12 +61,19 @@ jobs:
           set -euo pipefail
           chmod +x scripts/diy-part1.sh
           cd openwrt
+          bash $GITHUB_WORKSPACE/$THEME_SETTING_SH
+          bash $GITHUB_WORKSPACE/$PRESET_CLASH_SH amd64
           "$GITHUB_WORKSPACE/scripts/diy-part1.sh"
           echo '--- feeds.conf.default ---'
           cat feeds.conf.default
 
       - name: 更新软件源
-        run: cd openwrt && ./scripts/feeds update -a
+        run: |
+         cd openwrt 
+         ./scripts/feeds install -a -p nas
+         ./scripts/feeds install -a -p nas_luci
+         ./scripts/feeds install -d y -p istore luci-app-store
+         ./scripts/feeds update -a
 
       - name: 安装软件包
         run: cd openwrt && ./scripts/feeds install -a
