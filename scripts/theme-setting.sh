@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 定义路径
-ARGON_THEME_DIR="package/luci-theme-argon"
+ARGON_THEME_DIR="package/community/luci-theme-argon"
 BACKGROUND_URL="https://raw.githubusercontent.com/herofence/openwrt/main/background.jpg"
 TARGET_BG="$ARGON_THEME_DIR/htdocs/luci-static/argon/background/background.jpg"
 
