@@ -152,7 +152,7 @@ jobs:
             echo "🧊源码分支 openwrt-25.12"
             echo "🌐默认地址192.168.2.1"
             echo "🔑默认密码 password"
-            echo "👉时间 $(date -u '+%Y-%m-%d %H:%M UTC')"            
+            echo "👉时间 $(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M %Z')"           
           } > release.md
           echo "status=success" >> $GITHUB_OUTPUT
 
