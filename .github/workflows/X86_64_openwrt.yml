@@ -132,24 +132,14 @@ jobs:
           set -euo pipefail
           echo "tag=immortalwrt-$(date +%Y.%m.%d-%H%M)" >> $GITHUB_OUTPUT
           {
-            echo "Unofficial automated build. Not affiliated with, endorsed by, or reviewed by upstream."
-            echo
-            echo "| | |"
-            echo "|---|---|"
-            echo "| Source | [ImmortalWrt](https://github.com/immortalwrt/immortalwrt) |"
-            echo "| Branch | \`openwrt-25.12\` |"
-            echo "| Target | x86_64 generic, EFI |"
-            echo "| Built | $(date -u '+%Y-%m-%d %H:%M UTC') |"
             echo
             echo "📒固件信息"
-            echo
-            echo "💻| 项目 | 内容 |"
-            echo "⚽|---|---|"
-            echo "💝| 平台架构 | x86-64 |"
-            echo "🚀| 固件源码 | [ImmortalWrt](https://github.com/immortalwrt/immortalwrt) |"
-            echo "🧊| 源码分支 | openwrt-25.12 |"
-            echo "🌐| 默认地址 | 192.168.2.1 |"
-            echo "🔑| 默认密码 | password |"
+            echo "💝平台架构 x86-64"
+            echo "🚀固件源码https://github.com/immortalwrt/immortalwrt"
+            echo "🧊源码分支 openwrt-25.12"
+            echo "🌐默认地址192.168.2.1"
+            echo "🔑默认密码 password"
+            echo "👉时间 $(date -u '+%Y-%m-%d %H:%M UTC')"            
           } > release.md
           echo "status=success" >> $GITHUB_OUTPUT
 
