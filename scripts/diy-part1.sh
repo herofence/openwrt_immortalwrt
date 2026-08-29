@@ -21,7 +21,16 @@ git clone --depth=1 https://github.com/esirplayground/luci-app-poweroff
 git clone --depth=1 https://github.com/Jason6111/luci-app-netdata
 git clone --depth=1 https://github.com/pymumu/luci-app-smartdns
 git clone --depth=1 https://github.com/vernesong/OpenClash.git
+# 新增：克隆带中文包的 dockerman
+git clone --depth=1 https://github.com/lisaac/luci-app-dockerman.git
 popd
+
+# 删除官方源中可能存在的 dockerman 及其语言包，避免与第三方冲突
+# 注意：这些路径在 feeds 更新前可能不存在，使用 -rf 忽略错误
+rm -rf feeds/luci/applications/luci-app-dockerman
+rm -rf feeds/luci/applications/luci-i18n-dockerman-zh-cn
+rm -rf feeds/packages/admin/luci-app-dockerman
+rm -rf feeds/packages/admin/luci-i18n-dockerman-zh-cn
 
 # x86 型号只显示 CPU 型号
 if [ -f "package/immortalwrt/autocore/files/x86/autocore" ]; then
