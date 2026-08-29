@@ -1,14 +1,12 @@
 #!/bin/bash
-#软件源修改
-# 1. 设置 Git 使用 token 认证（如果存在）
+# 设置 Git 认证
 if [ -n "${GITHUB_TOKEN}" ]; then
     git config --global url."https://oauth2:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
 fi
 
-# 2. 克隆第三方插件包到 package/community 目录
+# 克隆第三方插件包到 package/community
 mkdir -p package/community
 pushd package/community
-# 主题与常用应用
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
 git clone --depth=1 https://github.com/y9858/luci-theme-opentomcat
@@ -21,33 +19,26 @@ git clone --depth=1 -b openwrt-18.06 https://github.com/tty228/luci-app-wechatpu
 git clone --depth=1 https://github.com/ilxp/luci-app-ikoolproxy
 git clone --depth=1 https://github.com/esirplayground/luci-app-poweroff
 git clone --depth=1 https://github.com/Jason6111/luci-app-netdata
-# SmartDNS (保留单个官方推荐源)
 git clone --depth=1 https://github.com/pymumu/luci-app-smartdns
-# OpenClash
 git clone --depth=1 https://github.com/vernesong/OpenClash.git
 popd
 
-# 3. 更改默认主题为 Argon
-sed -i 's/luci-theme-design/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
-sed -i 's/luci-theme-bootstrap/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
-
-# 4. x86 型号只显示 CPU 型号
+# x86 型号只显示 CPU 型号
 if [ -f "package/immortalwrt/autocore/files/x86/autocore" ]; then
     sed -i 's/${g}.*/${a}${b}${c}${d}${e}${f}${hydrid}/g' package/immortalwrt/autocore/files/x86/autocore
 elif [ -f "package/lean/autocore/files/x86/autocore" ]; then
     sed -i 's/${g}.*/${a}${b}${c}${d}${e}${f}${hydrid}/g' package/lean/autocore/files/x86/autocore
 fi
 
-# 5. 修改本地时间格式
+# 修改本地时间格式（仅针对 package/ 目录）
 find package/ -path "*/autocore/files/*/index.htm" -exec sed -i 's#os.date()#os.date("%Y-%m-%d %H:%M:%S") .. " " .. translate(os.date("%A"))#g' {} \; 2>/dev/null
-find feeds/luci/ -path "*/system.lua" -exec sed -i 's/os.date("%c")/os.date("%Y-%m-%d %H:%M:%S")/g' {} \; 2>/dev/null
 
-# 6. 最大连接数修改为 65535
+# 最大连接数修改为 65535
 if [ -f "package/base-files/files/etc/sysctl.conf" ]; then
     sed -i '/customized in this file/a net.netfilter.nf_conntrack_max=65535' package/base-files/files/etc/sysctl.conf
 fi
 
-# 7. 修改版本号展示
+# 修改版本号展示
 date_version=$(date +"%y.%m.%d")
 if [ -f "package/immortalwrt/default-settings/files/zzz-default-settings" ]; then
     orig_version=$(cat "package/immortalwrt/default-settings/files/zzz-default-settings" | grep DISTRIB_REVISION= | awk -F "'" '{print $2}')
@@ -57,7 +48,7 @@ elif [ -f "package/lean/default-settings/files/zzz-default-settings" ]; then
     sed -i "s/${orig_version}/R${date_version} by herofence/g" package/lean/default-settings/files/zzz-default-settings
 fi
 
-# 8. 取消主题默认配置覆盖
-find package/luci-theme-*/* -type f -name '*luci-theme-*' -print -exec sed -i '/set luci.main.mediaurlbase/d' {} \; 2>/dev/null
+# 取消主题默认配置覆盖（修正路径）
+find package/community/luci-theme-* -type f -exec sed -i '/set luci.main.mediaurlbase/d' {} \; 2>/dev/null
 
 echo "脚本执行完成"
