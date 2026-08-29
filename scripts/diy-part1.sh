@@ -4,7 +4,7 @@ if [ -n "${GITHUB_TOKEN}" ]; then
     git config --global url."https://oauth2:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
 fi
 
-# 克隆第三方插件包到 package/community
+# 克隆第三方插件包到 package/community，隔离核心包目录
 mkdir -p package/community
 pushd package/community
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
