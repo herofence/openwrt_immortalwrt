@@ -128,6 +128,8 @@ jobs:
           fi
           cd "$FIRMWARE_DIR"
           rm -rf packages
+          rm -f feeds.buildinfo
+          cp "$GITHUB_WORKSPACE/openwrt/.config" ./build.config
           echo "FIRMWARE=$PWD" >> $GITHUB_ENV
           echo "status=success" >> $GITHUB_OUTPUT
 
