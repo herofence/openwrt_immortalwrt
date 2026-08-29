@@ -10,6 +10,3 @@ find feeds/luci/ -path "*/system.lua" -exec sed -i 's/os.date("%c")/os.date("%Y-
 
 # 3. 修改默认IP
 sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
-
-# 4. 修改 boot 分区大小
-sed -i 's/\(BOOT_SIZE := \)[0-9]*/\11024/' target/linux/x86/image/Makefile
