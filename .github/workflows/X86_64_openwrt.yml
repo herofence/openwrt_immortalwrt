@@ -1,214 +1,54 @@
-name: immortalwrt_x86_64
+#!/bin/bash
+# 设置 Git 认证
+if [ -n "${GITHUB_TOKEN}" ]; then
+    git config --global url."https://oauth2:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+fi
 
-on:
-  workflow_dispatch:
-  schedule:
-  # 每周四 5:00执行一次
-    - cron: 0 21 * * WED
+# 克隆第三方插件包到 package/community，隔离核心包目录
+mkdir -p package/community
+pushd package/community
+git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
+git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
+git clone --depth=1 https://github.com/y9858/luci-theme-opentomcat
+git clone --depth=1 https://github.com/lisaac/luci-app-diskman
+git clone --depth=1 https://github.com/gdy666/luci-app-lucky
+git clone --depth=1 https://github.com/sirpdboy/netspeedtest
+git clone --depth=1 https://github.com/lmq8267/luci-app-vnt
+git clone --depth=1 https://github.com/EasyTier/luci-app-easytier
+git clone --depth=1 -b openwrt-18.06 https://github.com/tty228/luci-app-wechatpush
+git clone --depth=1 https://github.com/ilxp/luci-app-ikoolproxy
+git clone --depth=1 https://github.com/esirplayground/luci-app-poweroff
+git clone --depth=1 https://github.com/Jason6111/luci-app-netdata
+git clone --depth=1 https://github.com/pymumu/luci-app-smartdns
+git clone --depth=1 https://github.com/vernesong/OpenClash.git
+popd
 
-env:
-  REPO_URL: https://github.com/immortalwrt/immortalwrt
-  REPO_BRANCH: openwrt-24.10
-  CONFIG_FILE: configs/X86.config
-  ENV_SH: scripts/environment.sh
-  DIY_P1_SH: scripts/diy-part1.sh
-  DIY_P2_SH: scripts/diy-part2.sh
-  THEME_SETTING_SH: scripts/theme-setting.sh
-  PRESET_CLASH_SH: scripts/preset-clash-core.sh
-  SYSTEM_INFO: scripts/system-Information.sh
-  UPLOAD_FIRMWARE: true
-  UPLOAD_RELEASE: true
-  TZ: Asia/Shanghai
+# x86 型号只显示 CPU 型号
+if [ -f "package/immortalwrt/autocore/files/x86/autocore" ]; then
+    sed -i 's/${g}.*/${a}${b}${c}${d}${e}${f}${hydrid}/g' package/immortalwrt/autocore/files/x86/autocore
+elif [ -f "package/lean/autocore/files/x86/autocore" ]; then
+    sed -i 's/${g}.*/${a}${b}${c}${d}${e}${f}${hydrid}/g' package/lean/autocore/files/x86/autocore
+fi
 
-jobs:
-  build:
-    runs-on: ubuntu-22.04
-    steps:
-      - name: 容量设置
-        uses: easimon/maximize-build-space@master
-        with:
-          root-reserve-mb: 512
-          swap-size-mb: 1024
-          remove-dotnet: 'true'
-          remove-android: 'true'
-          remove-haskell: 'true'
-          remove-codeql: 'true'
+# 修改本地时间格式（仅针对 package/ 目录）
+find package/ -path "*/autocore/files/*/index.htm" -exec sed -i 's#os.date()#os.date("%Y-%m-%d %H:%M:%S") .. " " .. translate(os.date("%A"))#g' {} \; 2>/dev/null
 
-      - name: 查看项目代码
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+# 最大连接数修改为 65535
+if [ -f "package/base-files/files/etc/sysctl.conf" ]; then
+    sed -i '/customized in this file/a net.netfilter.nf_conntrack_max=65535' package/base-files/files/etc/sysctl.conf
+fi
 
-      - name: 清理磁盘空间
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
+# 修改版本号展示
+date_version=$(date +"%y.%m.%d")
+if [ -f "package/immortalwrt/default-settings/files/zzz-default-settings" ]; then
+    orig_version=$(cat "package/immortalwrt/default-settings/files/zzz-default-settings" | grep DISTRIB_REVISION= | awk -F "'" '{print $2}')
+    sed -i "s/${orig_version}/R${date_version} by herofence/g" package/immortalwrt/default-settings/files/zzz-default-settings
+elif [ -f "package/lean/default-settings/files/zzz-default-settings" ]; then
+    orig_version=$(cat "package/lean/default-settings/files/zzz-default-settings" | grep DISTRIB_REVISION= | awk -F "'" '{print $2}')
+    sed -i "s/${orig_version}/R${date_version} by herofence/g" package/lean/default-settings/files/zzz-default-settings
+fi
 
-      - name: 初始化编译环境
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: |
-          sudo docker image prune --all --force
-          sudo rm -f /usr/local/bin/runc
-          chmod +x $ENV_SH
-          bash $ENV_SH
-          sudo -E apt-get -qq autoremove --purge > /dev/null
-          sudo -E apt-get -qq clean > /dev/null
-          sudo timedatectl set-timezone "$TZ"
+# 取消主题默认配置覆盖
+find package/community/luci-theme-* -type f -exec sed -i '/set luci.main.mediaurlbase/d' {} \; 2>/dev/null
 
-      - name: 系统信息
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: |
-          chmod +x $SYSTEM_INFO
-          $GITHUB_WORKSPACE/$SYSTEM_INFO
-
-      - name: 下载源码
-        run: |
-          git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
-          cd openwrt
-          echo 'src-git istore https://github.com/linkease/istore;main' >> feeds.conf.default
-          echo 'src-git nas https://github.com/linkease/nas-packages.git;master' >> feeds.conf.default
-          echo 'src-git nas_luci https://github.com/linkease/nas-packages-luci.git;main' >> feeds.conf.default
-          echo "OPENWRT_PATH=$PWD" >> $GITHUB_ENV
-          COMMIT_AUTHOR=$(git show -s --date=short --format="作者: %an" 2>/dev/null || echo "作者: 未知")
-          echo "COMMIT_AUTHOR=$COMMIT_AUTHOR" >> $GITHUB_ENV
-          COMMIT_DATE=$(git show -s --date=short --format="时间: %ci" 2>/dev/null || echo "时间: 未知")
-          echo "COMMIT_DATE=$COMMIT_DATE" >> $GITHUB_ENV
-          COMMIT_MESSAGE=$(git show -s --date=short --format="内容: %s" 2>/dev/null || echo "内容: 未知")
-          echo "COMMIT_MESSAGE=$COMMIT_MESSAGE" >> $GITHUB_ENV
-          COMMIT_HASH=$(git show -s --date=short --format="hash: %H" 2>/dev/null || echo "hash: 未知")
-          echo "COMMIT_HASH=$COMMIT_HASH" >> $GITHUB_ENV
-
-      - name: 加载自定义软件源
-        run: |
-          chmod +x $DIY_P1_SH
-          cd openwrt
-          [ -f "$GITHUB_WORKSPACE/$CONFIG_FILE" ] && cp "$GITHUB_WORKSPACE/$CONFIG_FILE" .config
-          bash $GITHUB_WORKSPACE/$DIY_P1_SH
-          bash $GITHUB_WORKSPACE/$THEME_SETTING_SH
-          bash $GITHUB_WORKSPACE/$PRESET_CLASH_SH amd64
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}          
-
-      - name: 更新和安装源
-        working-directory: ./openwrt
-        run: |
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a
-
-      - name: 加载自定义配置
-        run: |
-          set -euo pipefail
-          cp $CONFIG_FILE openwrt/.config
-          chmod +x $DIY_P2_SH
-          cd openwrt
-          "$GITHUB_WORKSPACE/$DIY_P2_SH"
-
-      - name: 更新软件源
-        id: package
-        run: |
-          cd openwrt
-          make defconfig
-          make download -j$(nproc)
-          find dl -size -1024c -exec ls -l {} \;
-          find dl -size -1024c -exec rm -f {} \;
-
-      - name: 编译固件
-        id: compile
-        run: |
-          cd openwrt
-          export GO111MODULE=on
-          export GOPROXY=https://goproxy.cn,direct
-          export GOTOOLCHAIN=auto
-          echo -e "$(nproc) thread compile"
-          make -j$(nproc) || make -j1 V=s
-          echo "date1=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
-          echo "date2=$(date "+%Y年%m月%d日")" >> $GITHUB_ENV
-          echo "status=success" >> $GITHUB_OUTPUT
-          DEVICE_TARGET=$(cat .config | grep CONFIG_TARGET_BOARD | awk -F '"' '{print $2}' 2>/dev/null || echo "x86")
-          echo "DEVICE_TARGET=$DEVICE_TARGET" >> $GITHUB_ENV
-          DEVICE_SUBTARGET=$(cat .config | grep CONFIG_TARGET_SUBTARGET | awk -F '"' '{print $2}' 2>/dev/null || echo "64")
-          echo "DEVICE_SUBTARGET=$DEVICE_SUBTARGET" >> $GITHUB_ENV
-          KERNEL_VER=$(cat bin/targets/${DEVICE_TARGET}/${DEVICE_SUBTARGET}/*.manifest 2>/dev/null | grep ^kernel | head -1 | cut -d- -f2 | tr -d ' ' || echo "未知")
-          echo "KERNEL_VER=$KERNEL_VER" >> $GITHUB_ENV
-
-      - name: 整理文件
-        id: organize
-        if: ${{ env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
-        run: |
-          cd openwrt/bin/targets/${{ env.DEVICE_TARGET }}/${{ env.DEVICE_SUBTARGET }}
-          [ -f "$OPENWRT_PATH/.config" ] && cp "$OPENWRT_PATH/.config" build.config
-          cat << EOF > config.buildinfo
-          CONFIG_TARGET_BOARD=${{ env.DEVICE_TARGET }}
-          CONFIG_TARGET_SUBTARGET=${{ env.DEVICE_SUBTARGET }}
-          CONFIG_KERNEL_VERSION=${{ env.KERNEL_VER }}
-          CONFIG_REPO_URL=${{ env.REPO_URL }}
-          CONFIG_REPO_BRANCH=${{ env.REPO_BRANCH }}
-          CONFIG_BUILD_DATE=${{ env.date1 }}
-          CONFIG_BUILD_NUMBER=${{ github.run_number }}
-          CONFIG_RANDOM_CODE=${{ github.run_number }}
-          EOF
-          echo "清理不需要的文件..."
-          rm -rf packages
-          rm -f *rootfs.tar.gz *.json sha256sums *.manifest
-          echo "最终保留的文件："
-          ls -lah
-          echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-          echo "status=success" >> $GITHUB_OUTPUT
-
-      - name: 上传固件
-        uses: actions/upload-artifact@v4
-        if: steps.organize.outputs.status == 'success' && !cancelled()
-        with:
-          name: immortalwrt_${{ env.date1 }}_${{ env.DEVICE_TARGET }}_${{ env.DEVICE_SUBTARGET }}
-          path: ${{ env.FIRMWARE }}
-
-      - name: 发布固件
-        id: tag
-        if: env.UPLOAD_RELEASE == 'true' && !cancelled()
-        run: |
-          echo "release_tag=${{ env.date1 }}_build${{ github.run_number }}" >> $GITHUB_OUTPUT
-          # 生成新格式的发布名称（immortalwrt-YYYY.MM.DD-HHMM）
-          RELEASE_NAME="immortalwrt-${{ env.date1 }}-$(date +%H%M)"
-          echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_ENV
-
-          # 将提交时间转换为北京时间（从 COMMIT_DATE 中提取原始时间）
-          COMMIT_RAW=$(echo "$COMMIT_DATE" | sed 's/^时间: //')
-          COMMIT_BJ=$(TZ=Asia/Shanghai date -d "$COMMIT_RAW" "+%Y-%m-%d %H:%M:%S")
-          # 固定作者为 herofence
-          COMMIT_AUTHOR_FIXED="herofence"
-
-          cat << EOF > release.txt
-          ### 🏪固件信息
-          - 🙏固件包含：Openclash、IPV6、打印机驱动、Zerotier、Easytier、应用过滤、Docker、Lucky、Istore、AdBlock Fast
-          - 📱平台架构: ${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}
-          - 🐳固件源码: ${{ env.REPO_URL }}
-          - 📁源码分支: ${{ env.REPO_BRANCH }}
-          - 📝内核版本: ${{ env.KERNEL_VER }}
-          - 📥默认地址: 192.168.2.1
-          - 🛠️默认密码: password
-          ### 固件版本
-          - 固件编译前最后一次[主源码](${{ env.REPO_URL }}) 更新记录
-          - 时间: $COMMIT_BJ
-          - ${{ env.COMMIT_MESSAGE }}
-          - ${{ env.COMMIT_HASH }}
-          EOF
-          echo "status=success" >> $GITHUB_OUTPUT
-
-      - name: 发布说明
-        uses: softprops/action-gh-release@v2
-        if: steps.tag.outputs.status == 'success' && !cancelled()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          files: ${{ env.FIRMWARE }}/*
-          name: ${{ env.RELEASE_NAME }}
-          tag_name: ${{ steps.tag.outputs.release_tag }}
-          body_path: release.txt
+echo "脚本执行完成"
