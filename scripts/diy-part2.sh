@@ -42,3 +42,15 @@ if [ -d "package/community/luci-app-dockerman" ]; then
     echo "检查 dockerman 中文语言包..."
     find package/community/luci-app-dockerman -path "*luci-i18n-dockerman-zh-cn*" -type d | head -5
 fi
+# 验证 dockerman 版本号格式
+echo "=== 验证 dockerman 版本号 ==="
+if [ -f "package/community/luci-app-dockerman/applications/luci-app-dockerman/Makefile" ]; then
+    grep "^PKG_VERSION" package/community/luci-app-dockerman/applications/luci-app-dockerman/Makefile
+    # 检查是否还有 v 前缀
+    if grep -q "^PKG_VERSION:=v" package/community/luci-app-dockerman/applications/luci-app-dockerman/Makefile; then
+        echo "警告：版本号仍有 v 前缀！"
+        exit 1
+    else
+        echo "版本号格式正确"
+    fi
+fi
