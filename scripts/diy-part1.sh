@@ -33,6 +33,12 @@ find luci-app-dockerman -name "Makefile" -type f -exec sed -i 's/PKG_VERSION:=v\
 cd ..
 popd
 
+# 删除官方源中可能存在的冲突包
+rm -rf feeds/luci/applications/luci-app-dockerman
+rm -rf feeds/luci/applications/luci-i18n-dockerman-zh-cn
+rm -rf feeds/packages/admin/luci-app-dockerman
+rm -rf feeds/packages/admin/luci-i18n-dockerman-zh-cn
+
 # x86 型号只显示 CPU 型号
 if [ -f "package/immortalwrt/autocore/files/x86/autocore" ]; then
     sed -i 's/${g}.*/${a}${b}${c}${d}${e}${f}${hydrid}/g' package/immortalwrt/autocore/files/x86/autocore
