@@ -1,6 +1,16 @@
 #!/bin/bash
 # 配置修改
 
+# 0. 移除Rust包避免LLVM编译问题（编译错误修复）
+echo "正在移除Rust相关包以避免LLVM编译问题..."
+./scripts/feeds uninstall rust 2>/dev/null || true
+# 清理可能存在的Rust配置
+if [ -f ".config" ]; then
+    sed -i '/CONFIG_PACKAGE_rust/d' .config
+    sed -i '/CONFIG_PACKAGE_rust-bootstrap/d' .config
+fi
+echo "Rust包已移除"
+
 # 1. 修改默认主题
 sed -i 's/luci-theme-design/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
 sed -i 's/luci-theme-bootstrap/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
@@ -11,46 +21,5 @@ find feeds/luci/ -path "*/system.lua" -exec sed -i 's/os.date("%c")/os.date("%Y-
 # 3. 修改默认IP
 sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
 
-# 4.修改主机名字，把herofence修改你喜欢的就行（不能纯数字或者使用中文）
-# sed -i s/OpenWrt/herovence/g package/base-files/files/bin/config_generate
-
-# 5.修复第三方 dockerman 版本号（更全面的处理）
-if [ -d "package/community/luci-app-dockerman" ]; then
-    echo "修复 luci-app-dockerman 版本号格式..."
-    # 查找所有 Makefile
-    find package/community/luci-app-dockerman -name "Makefile" -type f | while read makefile; do
-        echo "处理: $makefile"
-        # 备份原始文件
-        cp "$makefile" "$makefile.bak"
-        # 修复各种可能的版本号格式问题
-        # 1. PKG_VERSION:=v0.5.26 -> PKG_VERSION:=0.5.26
-        sed -i 's/^PKG_VERSION:=v\([0-9]\)/PKG_VERSION:=\1/' "$makefile"
-        # 2. PKG_VERSION = v0.5.26 -> PKG_VERSION = 0.5.26
-        sed -i 's/^PKG_VERSION\s*:=\s*v\([0-9]\)/PKG_VERSION:=\1/' "$makefile"
-        # 3. 处理可能的引号
-        sed -i 's/^PKG_VERSION:="v\([0-9]\)/PKG_VERSION:="\1/' "$makefile"
-        # 显示修改结果
-        echo "修改后的版本号："
-        grep "^PKG_VERSION" "$makefile"
-        # 删除备份
-        rm -f "$makefile.bak"
-    done
-    echo "版本号修复完成"
-fi
-# 确保中文语言包存在
-if [ -d "package/community/luci-app-dockerman" ]; then
-    echo "检查 dockerman 中文语言包..."
-    find package/community/luci-app-dockerman -path "*luci-i18n-dockerman-zh-cn*" -type d | head -5
-fi
-# 验证 dockerman 版本号格式
-echo "=== 验证 dockerman 版本号 ==="
-if [ -f "package/community/luci-app-dockerman/applications/luci-app-dockerman/Makefile" ]; then
-    grep "^PKG_VERSION" package/community/luci-app-dockerman/applications/luci-app-dockerman/Makefile
-    # 检查是否还有 v 前缀
-    if grep -q "^PKG_VERSION:=v" package/community/luci-app-dockerman/applications/luci-app-dockerman/Makefile; then
-        echo "警告：版本号仍有 v 前缀！"
-        exit 1
-    else
-        echo "版本号格式正确"
-    fi
-fi
+# 修改主机名字
+sed -i s/OpenWrt/herofence/g package/base-files/files/bin/config_generate
