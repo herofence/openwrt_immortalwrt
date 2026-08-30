@@ -3,7 +3,8 @@ name: immortalwrt_x86_64
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 19 * * 4'
+  # 每周四 5:00执行一次
+    - cron: 0 21 * * WED
 
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
