@@ -22,4 +22,4 @@ find feeds/luci/ -path "*/system.lua" -exec sed -i 's/os.date("%c")/os.date("%Y-
 sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
 
 # 修改主机名字
-sed -i s/OpenWrt/herofence/g package/base-files/files/bin/config_generate
+# sed -i s/OpenWrt/herofence/g package/base-files/files/bin/config_generate
