@@ -186,7 +186,7 @@ jobs:
           COMMIT_AUTHOR_FIXED="herofence"
 
           cat << EOF > release.txt
-          ##🏪固件信息
+          - 🏪固件信息
           - 🙏固件包含：Openclash、IPV6、打印机驱动、Zerotier、Easytier、应用过滤、Docker、Lucky、Istore、AdBlock Fast
           - 📱平台架构: ${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}
           - 🐳固件源码: ${{ env.REPO_URL }}
@@ -194,11 +194,10 @@ jobs:
           - 📝内核版本: ${{ env.KERNEL_VER }}
           - 📥默认地址: 192.168.2.1
           - 🛠️默认密码: password
-          ##固件版本
-          - 固件编译前最后一次[主源码](${{ env.REPO_URL }}) 更新记录
-          - 时间: $COMMIT_BJ
-          - ${{ env.COMMIT_MESSAGE }}
-          - ${{ env.COMMIT_HASH }}
+          - 👩‍🏭固件编译前最后一次[主源码](${{ env.REPO_URL }}) 更新记录
+          - 📺时间: $COMMIT_BJ
+          - 🚀${{ env.COMMIT_MESSAGE }}
+          - ✅${{ env.COMMIT_HASH }}
           EOF
           echo "status=success" >> $GITHUB_OUTPUT
 
