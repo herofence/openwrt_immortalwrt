@@ -13,6 +13,7 @@ sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generat
 
 # 4.修改主机名字，把herofence修改你喜欢的就行（不能纯数字或者使用中文）
 # sed -i s/OpenWrt/herovence/g package/base-files/files/bin/config_generate
+
 # 5.修复第三方 dockerman 版本号（更全面的处理）
 if [ -d "package/community/luci-app-dockerman" ]; then
     echo "修复 luci-app-dockerman 版本号格式..."
