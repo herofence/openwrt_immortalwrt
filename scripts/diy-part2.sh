@@ -14,18 +14,36 @@ sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generat
 # 修改主机名字，把herofence修改你喜欢的就行（不能纯数字或者使用中文）
 # sed -i s/OpenWrt/herovence/g package/base-files/files/bin/config_generate
 
-# 4. 修复第三方 dockerman 版本号（APK 包管理器不允许 v 前缀）
+# 修复第三方 dockerman 版本号（更全面的处理）
 if [ -d "package/community/luci-app-dockerman" ]; then
     echo "修复 luci-app-dockerman 版本号格式..."
+    
+    # 查找所有 Makefile
     find package/community/luci-app-dockerman -name "Makefile" -type f | while read makefile; do
         echo "处理: $makefile"
-        # 修复 PKG_VERSION
-        sed -i 's/PKG_VERSION:=v\([0-9]\)/PKG_VERSION:=\1/' "$makefile"
-        # 修复 PKG_SOURCE_VERSION（如果是 v 开头的 tag）
-        sed -i 's/PKG_SOURCE_VERSION:=v/PKG_SOURCE_VERSION:=/' "$makefile"
-        # 显示修改后的版本号
-        grep -E "PKG_VERSION|PKG_SOURCE_VERSION" "$makefile" | head -5
+        
+        # 备份原始文件
+        cp "$makefile" "$makefile.bak"
+        
+        # 修复各种可能的版本号格式问题
+        # 1. PKG_VERSION:=v0.5.26 -> PKG_VERSION:=0.5.26
+        sed -i 's/^PKG_VERSION:=v\([0-9]\)/PKG_VERSION:=\1/' "$makefile"
+        
+        # 2. PKG_VERSION = v0.5.26 -> PKG_VERSION = 0.5.26
+        sed -i 's/^PKG_VERSION\s*:=\s*v\([0-9]\)/PKG_VERSION:=\1/' "$makefile"
+        
+        # 3. 处理可能的引号
+        sed -i 's/^PKG_VERSION:="v\([0-9]\)/PKG_VERSION:="\1/' "$makefile"
+        
+        # 显示修改结果
+        echo "修改后的版本号："
+        grep "^PKG_VERSION" "$makefile"
+        
+        # 删除备份
+        rm -f "$makefile.bak"
     done
+    
+    echo "版本号修复完成"
 fi
 
 # 5. 确保中文语言包存在
