@@ -23,6 +23,8 @@ git clone --depth=1 https://github.com/pymumu/luci-app-smartdns
 git clone --depth=1 https://github.com/vernesong/OpenClash.git
 # 新增：克隆带中文包的 dockerman
 git clone --depth=1 https://github.com/lisaac/luci-app-dockerman.git
+find luci-app-dockerman -name "Makefile" -type f -exec sed -i 's/PKG_VERSION:=v\([0-9]\)/PKG_VERSION:=\1/' {} \;
+cd ..
 popd
 git clone https://github.com/linkease/nas-packages-luci.git package/community/luci-app-quickstart
 git clone https://github.com/linkease/nas-packages.git package/community/quickstart
