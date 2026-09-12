@@ -187,7 +187,7 @@ jobs:
 
           cat << EOF > release.txt
           - 🏪固件信息
-          - 🙏固件包含：Openclash、IPV6、打印机驱动、Zerotier、Easytier、应用过滤、Docker、Lucky、Istore、AdBlock Fast
+          - 🙏固件包含：Openclash、IPV6、打印机驱动、Zerotier、VNT、Docker、Lucky、Istore
           - 📱平台架构: ${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}
           - 🐳固件源码: ${{ env.REPO_URL }}
           - 📁源码分支: ${{ env.REPO_BRANCH }}
