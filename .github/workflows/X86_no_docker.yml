@@ -9,7 +9,7 @@ on:
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: master
-  CONFIG_FILE: configs/X86.config
+  CONFIG_FILE: configs/x86_no_docker.config
   ENV_SH: scripts/environment.sh
   DIY_P1_SH: scripts/diy-part1.sh
   DIY_P2_SH: scripts/diy-part2.sh
