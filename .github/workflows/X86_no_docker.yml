@@ -2,9 +2,9 @@ name: immortalwrt_x86_no_docker
 
 on:
   workflow_dispatch:
-  schedule:
+ # schedule:
   # 每周四 5:00执行一次
-    - cron: 0 21 * * WED
+  #  - cron: 0 21 * * WED
 
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
